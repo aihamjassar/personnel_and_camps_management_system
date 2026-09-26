@@ -1,0 +1,231 @@
+// 13 tables per docs/Architecture.md §5 (3NF) + join tables from §5.2.
+// Column names mapped to snake_case to match the documented data dictionary.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  user_id       Int         @id @default(autoincrement())
+  username      String      @unique
+  password_hash String
+  full_name     String
+  email         String?
+  is_active     Boolean     @default(true)
+  created_at    DateTime    @default(now())
+  updated_at    DateTime    @updatedAt
+  roles         UserRole[]
+  audit_logs    AuditLog[]
+  notifications Notification[]
+  status_changes PersonnelStatus[] @relation("StatusChangedBy")
+
+  @@map("users")
+}
+
+model Role {
+  role_id      Int              @id @default(autoincrement())
+  role_name    String           @unique
+  description  String?
+  users        UserRole[]
+  permissions  RolePermission[]
+
+  @@map("roles")
+}
+
+model Permission {
+  permission_id   Int              @id @default(autoincrement())
+  permission_key  String           @unique
+  description     String?
+  roles           RolePermission[]
+
+  @@map("permissions")
+}
+
+model UserRole {
+  user_id Int
+  role_id Int
+  user    User @relation(fields: [user_id], references: [user_id])
+  role    Role @relation(fields: [role_id], references: [role_id])
+
+  @@id([user_id, role_id])
+  @@map("user_roles")
+}
+
+model RolePermission {
+  role_id       Int
+  permission_id Int
+  role         Role       @relation(fields: [role_id], references: [role_id])
+  permission   Permission @relation(fields: [permission_id], references: [permission_id])
+
+  @@id([role_id, permission_id])
+  @@map("role_permissions")
+}
+
+model Personnel {
+  personnel_id   Int                @id @default(autoincrement())
+  full_name      String
+  national_id    String?            @unique
+  date_of_birth  DateTime?
+  gender         String?
+  phone          String?
+  email          String?
+  rank_id        Int?
+  unit_id        Int?
+  camp_id        Int? // current camp — source of truth for transfers/capacity
+  current_status String             @default("active")
+  is_active      Boolean            @default(true)
+  deleted_at     DateTime? // soft delete — never hard-delete (memory.md §7.1)
+  created_at     DateTime           @default(now())
+  updated_at     DateTime           @updatedAt
+  rank           Rank?              @relation(fields: [rank_id], references: [rank_id])
+  unit           OrganizationalUnit? @relation(fields: [unit_id], references: [unit_id])
+  camp           Camp?              @relation(fields: [camp_id], references: [camp_id])
+  assignments    Assignment[]
+  transfers_from Transfer[]         @relation("TransferFrom")
+  transfers_to   Transfer[]         @relation("TransferTo")
+  statuses       PersonnelStatus[]
+
+  @@index([camp_id])
+  @@index([unit_id])
+  @@map("personnel")
+}
+
+model Camp {
+  camp_id     Int                @id @default(autoincrement())
+  name        String             @unique
+  capacity    Int                @default(0)
+  location    String?
+  is_active   Boolean            @default(true)
+  created_at  DateTime           @default(now())
+  updated_at  DateTime           @updatedAt
+  units       OrganizationalUnit[]
+  personnel   Personnel[]
+  transfers_from Transfer[]      @relation("TransferFrom")
+  transfers_to   Transfer[]      @relation("TransferTo")
+
+  @@map("camps")
+}
+
+model OrganizationalUnit {
+  unit_id     Int         @id @default(autoincrement())
+  name        String
+  camp_id     Int
+  parent_unit_id Int?
+  created_at  DateTime    @default(now())
+  updated_at  DateTime    @updatedAt
+  camp        Camp        @relation(fields: [camp_id], references: [camp_id])
+  parent      OrganizationalUnit?  @relation("UnitHierarchy", fields: [parent_unit_id], references: [unit_id])
+  children    OrganizationalUnit[] @relation("UnitHierarchy")
+  personnel   Personnel[]
+  assignments Assignment[]
+
+  @@index([camp_id])
+  @@map("organizational_units")
+}
+
+model Rank {
+  rank_id     Int         @id @default(autoincrement())
+  name        String      @unique
+  level       Int         // ordinal order of the rank
+  description String?
+  personnel   Personnel[]
+
+  @@map("ranks")
+}
+
+model Position {
+  position_id Int          @id @default(autoincrement())
+  name        String
+  unit_id     Int?
+  description String?
+  created_at  DateTime     @default(now())
+  unit        OrganizationalUnit? @relation(fields: [unit_id], references: [unit_id])
+  assignments Assignment[]
+
+  @@map("positions")
+}
+
+model Assignment {
+  assignment_id Int      @id @default(autoincrement())
+  personnel_id  Int
+  unit_id       Int
+  position_id   Int
+  start_date    DateTime @default(now())
+  end_date      DateTime? // null = current assignment
+  notes         String?
+  created_at    DateTime @default(now())
+  personnel     Personnel         @relation(fields: [personnel_id], references: [personnel_id])
+  unit          OrganizationalUnit @relation(fields: [unit_id], references: [unit_id])
+  position      Position          @relation(fields: [position_id], references: [position_id])
+
+  @@index([personnel_id])
+  @@map("assignments")
+}
+
+model Transfer {
+  transfer_id     Int      @id @default(autoincrement())
+  personnel_id    Int
+  camp_from_id    Int
+  camp_to_id      Int
+  requested_by    Int? // users.user_id
+  status          String   @default("pending") // pending | approved | rejected | completed
+  reason          String?
+  requested_at    DateTime @default(now())
+  processed_at    DateTime?
+  personnel       Personnel @relation("TransferTo", fields: [personnel_id], references: [personnel_id])
+  camp_from       Camp      @relation("TransferFrom", fields: [camp_from_id], references: [camp_id])
+  camp_to         Camp      @relation("TransferTo", fields: [camp_to_id], references: [camp_id])
+
+  @@index([personnel_id])
+  @@map("transfers")
+}
+
+model PersonnelStatus {
+  status_id    Int      @id @default(autoincrement())
+  personnel_id Int
+  status       String // active | inactive | on_leave | ...
+  notes        String?
+  changed_by   Int? // users.user_id
+  created_at   DateTime @default(now()) // append-only history (memory.md §7.2)
+  personnel    Personnel @relation(fields: [personnel_id], references: [personnel_id])
+  changed_by_user User?  @relation("StatusChangedBy", fields: [changed_by], references: [user_id])
+
+  @@index([personnel_id])
+  @@map("personnel_status")
+}
+
+model AuditLog {
+  log_id       Int      @id @default(autoincrement())
+  user_id      Int? // null allowed for failed logins of unknown users
+  action_type  String
+  target_table String
+  target_id    Int?
+  old_value    Json?
+  new_value    Json?
+  ip_address   String?
+  created_at   DateTime @default(now())
+  user         User?    @relation(fields: [user_id], references: [user_id])
+
+  @@index([user_id])
+  @@index([created_at])
+  @@index([target_table])
+  @@map("audit_logs")
+}
+
+model Notification {
+  notification_id Int      @id @default(autoincrement())
+  user_id         Int
+  title           String
+  message         String
+  is_read         Boolean  @default(false)
+  created_at      DateTime @default(now())
+  user            User     @relation(fields: [user_id], references: [user_id])
+
+  @@index([user_id])
+  @@map("notifications")
+}
