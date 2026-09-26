@@ -6,7 +6,7 @@ import { writeAudit } from "../lib/audit.js";
 import { authenticate, requirePermission } from "../middleware/auth.js";
 import { validateBody } from "../middleware/validate.js";
 import { HttpError } from "../middleware/error.js";
-import { createUserSchema } from "../validators/schemas.js";
+import { createUserSchema, updateUserSchema } from "../validators/schemas.js";
 
 export const usersRouter = Router();
 usersRouter.use(authenticate);
@@ -81,6 +81,7 @@ usersRouter.post(
 usersRouter.put(
   "/:id",
   requirePermission("users.manage"),
+  validateBody(updateUserSchema),
   async (req, res, next) => {
     try {
       const id = Number(req.params.id);

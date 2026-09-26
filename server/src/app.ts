@@ -10,6 +10,7 @@ import { usersRouter } from "./routes/users.js";
 import { reportsRouter } from "./routes/reports.js";
 import { auditRouter } from "./routes/audit.js";
 import { fail } from "./lib/response.js";
+import { authenticate, requirePermission } from "./middleware/auth.js";
 
 export function createApp() {
   const app = express();
@@ -18,7 +19,7 @@ export function createApp() {
   app.use(cors({ origin: env.clientOrigin, credentials: true }));
   app.use(express.json({ limit: "1mb" }));
 
-  app.get("/api/v1/health", (_req, res) =>
+  app.get("/api/v1/health", authenticate, requirePermission("system.admin"), (_req, res) =>
     res.json({ status: "success", data: { ok: true }, error: null }),
   );
 

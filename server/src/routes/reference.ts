@@ -29,7 +29,7 @@ function simpleCrud<T extends { [K: string]: any }>(opts: {
 }) {
   const { router, model, idKey, permission, auditTable, auditType, createSchema, include, orderBy } = opts;
 
-  router.get("/", async (_req, res, next) => {
+  router.get("/", requirePermission(permission), async (_req, res, next) => {
     try {
       const items = await model.findMany({ include, orderBy: orderBy ?? { [idKey]: "asc" } });
       return ok(res, { items, total: items.length });
@@ -159,7 +159,7 @@ simpleCrud({
 export const assignmentsRouter = Router();
 assignmentsRouter.use(authenticate);
 
-assignmentsRouter.get("/", async (_req, res, next) => {
+assignmentsRouter.get("/", requirePermission("assignments.manage"), async (_req, res, next) => {
   try {
     const items = await prisma.assignment.findMany({
       include: {

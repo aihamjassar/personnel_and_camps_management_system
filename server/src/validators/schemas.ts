@@ -74,3 +74,13 @@ export const createUserSchema = z.object({
   email: z.email().max(200).optional(),
   role_ids: z.array(z.int().positive()).default([]),
 });
+
+export const updateUserSchema = z.object({
+  full_name: z.string().min(1).max(200).optional(),
+  email: z.union([z.email().max(200), z.null()]).optional(),
+  is_active: z.boolean().optional(),
+  password: z.string().min(8).max(200).optional(),
+  role_ids: z.array(z.int().positive()).optional(),
+}).refine((values) => Object.values(values).some((value) => value !== undefined), {
+  message: "At least one user field must be provided",
+});

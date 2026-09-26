@@ -34,7 +34,20 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
   const token = header.slice(7);
   let payload: TokenPayload;
   try {
-    payload = jwt.verify(token, env.jwtSecret) as TokenPayload;
+    const verified = jwt.verify(token, env.jwtSecret);
+    if (typeof verified === "string" || typeof verified.username !== "string") {
+      return fail(res, 401, "Invalid or expired token");
+    }
+    const rawSubject: unknown = verified.sub;
+    const userId = typeof rawSubject === "number"
+      ? rawSubject
+      : typeof rawSubject === "string" && rawSubject.trim() !== ""
+        ? Number(rawSubject)
+        : NaN;
+    if (!Number.isSafeInteger(userId) || userId <= 0) {
+      return fail(res, 401, "Invalid or expired token");
+    }
+    payload = { sub: userId, username: verified.username };
   } catch {
     return fail(res, 401, "Invalid or expired token");
   }

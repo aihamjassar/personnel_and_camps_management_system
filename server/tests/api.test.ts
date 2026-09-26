@@ -19,6 +19,11 @@ beforeAll(async () => {
   await prisma.permission.createMany({
     data: [
       { permission_key: "personnel.manage" },
+      { permission_key: "camps.manage" },
+      { permission_key: "units.manage" },
+      { permission_key: "ranks.manage" },
+      { permission_key: "positions.manage" },
+      { permission_key: "assignments.manage" },
       { permission_key: "reports.view" },
       { permission_key: "users.manage" },
       { permission_key: "system.admin" },
@@ -72,11 +77,17 @@ describe("auth", () => {
     expect(res.body).toMatchObject({ status: "success", error: null });
   });
 
-  it("rejects requests without a token", async () => {
-    const res = await request(app).get("/api/v1/personnel");
-    expect(res.status).toBe(401);
-    expect(res.body.status).toBe("fail");
-  });
+    it("rejects requests without a token", async () => {
+      const res = await request(app).get("/api/v1/personnel");
+      expect(res.status).toBe(401);
+      expect(res.body.status).toBe("fail");
+    });
+
+    it("rejects malformed bearer tokens", async () => {
+      const res = await request(app).get("/api/v1/personnel").set("Authorization", "Bearer not-a-jwt");
+      expect(res.status).toBe(401);
+      expect(res.body.status).toBe("fail");
+    });
 });
 
 describe("personnel", () => {
@@ -162,6 +173,49 @@ describe("personnel", () => {
     expect(res.status).toBe(400);
     expect(res.body.status).toBe("fail");
     expect(res.body.error.details).toBeDefined();
+  });
+});
+
+describe("RBAC coverage", () => {
+  it("requires the resource permission for every reference-data and assignment list", async () => {
+    const endpoints = ["/camps", "/units", "/ranks", "/positions", "/assignments"];
+    for (const endpoint of endpoints) {
+      const res = await request(app)
+        .get(`/api/v1${endpoint}`)
+        .set("Authorization", `Bearer ${officerToken}`);
+      expect(res.status, endpoint).toBe(403);
+      expect(res.body.status, endpoint).toBe("fail");
+    }
+  });
+
+  it("restricts health status to authenticated system administrators", async () => {
+    const anonymous = await request(app).get("/api/v1/health");
+    expect(anonymous.status).toBe(401);
+    const officer = await request(app).get("/api/v1/health").set("Authorization", `Bearer ${officerToken}`);
+    expect(officer.status).toBe(403);
+    const admin = await request(app).get("/api/v1/health").set("Authorization", `Bearer ${adminToken}`);
+    expect(admin.status).toBe(200);
+  });
+});
+
+describe("users", () => {
+  it("validates updates and never exposes password hashes", async () => {
+    const listed = await request(app).get("/api/v1/users").set("Authorization", `Bearer ${adminToken}`);
+    expect(listed.status).toBe(200);
+    expect(listed.body.data.items.every((user: { password_hash?: string }) => !("password_hash" in user))).toBe(true);
+
+    const target = await prisma.user.findUniqueOrThrow({ where: { username: "disabled_t" } });
+    const empty = await request(app)
+      .put(`/api/v1/users/${target.user_id}`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({});
+    expect(empty.status).toBe(400);
+
+    const invalid = await request(app)
+      .put(`/api/v1/users/${target.user_id}`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ password: "short", is_active: "yes" });
+    expect(invalid.status).toBe(400);
   });
 });
 

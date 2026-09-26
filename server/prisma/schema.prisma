@@ -86,8 +86,7 @@ model Personnel {
   unit           OrganizationalUnit? @relation(fields: [unit_id], references: [unit_id])
   camp           Camp?              @relation(fields: [camp_id], references: [camp_id])
   assignments    Assignment[]
-  transfers_from Transfer[]         @relation("TransferFrom")
-  transfers_to   Transfer[]         @relation("TransferTo")
+  transfers      Transfer[]         @relation("TransferPersonnel")
   statuses       PersonnelStatus[]
 
   @@index([camp_id])
@@ -123,6 +122,7 @@ model OrganizationalUnit {
   children    OrganizationalUnit[] @relation("UnitHierarchy")
   personnel   Personnel[]
   assignments Assignment[]
+  positions   Position[]
 
   @@index([camp_id])
   @@map("organizational_units")
@@ -177,7 +177,7 @@ model Transfer {
   reason          String?
   requested_at    DateTime @default(now())
   processed_at    DateTime?
-  personnel       Personnel @relation("TransferTo", fields: [personnel_id], references: [personnel_id])
+  personnel       Personnel @relation("TransferPersonnel", fields: [personnel_id], references: [personnel_id])
   camp_from       Camp      @relation("TransferFrom", fields: [camp_from_id], references: [camp_id])
   camp_to         Camp      @relation("TransferTo", fields: [camp_to_id], references: [camp_id])
 
