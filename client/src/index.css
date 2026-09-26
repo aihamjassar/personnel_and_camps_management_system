@@ -1,0 +1,35 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  font-family: "Noto Sans Arabic", "Segoe UI", Tahoma, Arial, sans-serif;
+  color: #17253a;
+  background: #f4f7fb;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-optical-sizing: auto;
+  font-size: 16px;
+}
+
+* { box-sizing: border-box; }
+html { min-width: 320px; scroll-behavior: smooth; }
+body { margin: 0; min-width: 320px; min-height: 100vh; }
+button, input, select, textarea { font: inherit; }
+button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
+  outline: 3px solid rgba(37, 99, 235, .45);
+  outline-offset: 2px;
+}
+::selection { background: #dbeafe; color: #17253a; }
+
+@layer components {
+  .table-wrap { @apply overflow-x-auto; }
+  .data-table { @apply w-full min-w-[700px] border-collapse text-right text-sm; }
+  .data-table thead { @apply bg-slate-50 text-xs font-bold text-slate-500; }
+  .data-table th { @apply whitespace-nowrap px-4 py-3.5; }
+  .data-table td { @apply border-t border-line px-4 py-3.5 text-slate-700; }
+  .data-table tbody tr:hover { @apply bg-slate-50/70; }
+  .toolbar-input { @apply min-h-10 rounded-xl border border-line bg-white px-3 text-sm text-ink outline-none placeholder:text-slate-400 focus:border-brand-500 focus:ring-4 focus:ring-brand-100; }
+}

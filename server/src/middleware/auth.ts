@@ -74,3 +74,14 @@ export function requirePermission(...keys: string[]) {
     next();
   };
 }
+
+
+// Read access may be shared with modules that need reference data for forms.
+export function requireAnyPermission(...keys: string[]) {
+  return (req: Request, res: Response, next: NextFunction) => {
+    if (!req.user) return fail(res, 401, "Authentication required");
+    const hasAny = keys.some((key) => req.user!.permissions.includes(key));
+    if (!hasAny) return fail(res, 403, "Insufficient permissions");
+    next();
+  };
+}

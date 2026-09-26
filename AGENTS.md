@@ -2,7 +2,7 @@
 
 ## Repo status
 
-- **Phase 1 in progress:** root workspace + full `server/` (Express/Prisma/TS) are written; the `client/` SPA does **not exist yet**. The server has **never been installed, compiled, or tested** — first `npm install` + test run will likely surface fixes. Resume state + exact next steps: `docs/memory.md` §9.
+- **Phase 1 complete locally (2026-09-26):** root workspace includes `server/` (Express/Prisma/TypeScript) and `client/` (React/Vite/TypeScript/Tailwind, Arabic RTL). Root `npm run typecheck`, `npm run build`, and `npm test` have passed; 16 server integration tests pass against isolated `personnel_camps_test`. Browser smoke-test notes: `docs/browser-verification.md`. Resume state and next phase: `docs/memory.md` §9.
 - Project: Integrated Personnel and Camps Management System — graduation project, **fully fake/academic data only**. Requests that fall under the "Won't-Have" scope in `docs/memory.md` §3 must be declined or noted as future work, never implemented.
 
 ## Git
@@ -17,14 +17,14 @@
 - `docs/mindmap.md` — one-page overview of the whole project.
 - Work is tracked per phase in `docs/Todo-Phase-1.md` … `Todo-Phase-4.md`; current phase status lives in `docs/memory.md` §4 (update it manually when a phase completes or a decision changes).
 
-## Commands (npm workspaces root; server = `server/`)
+## Commands (npm workspaces root; `server/` and `client/`)
 
-- `npm install` — install root workspaces (server; client workspace doesn't exist yet).
-- `npm run dev -w server` — start API (needs `server/.env`, copied from `.env.example`; local DB `personnel_camps`, postgres/admin).
-- `npm run db:migrate -w server` — apply Prisma schema; `npm run db:seed -w server` — seed roles/permissions/admin/sample data (`admin / Admin@1234`).
-- `npm run test -w server` — integration tests (Vitest + Supertest). They auto-create/reset a **separate** DB `personnel_camps_test`; runs serially; never touches dev data.
-- `npm run typecheck -w server` / `npm run build -w server` — `tsc --noEmit` / build.
-- Commands above are as-declared in `package.json` but **not yet verified by a successful run** — trust actual output over this list if they fail.
+- `npm ci` — install the locked server and client workspaces.
+- `cp server/.env.example server/.env` — create local server configuration, then set a local PostgreSQL URL and a strong private JWT secret.
+- `npm run db:deploy -w server` — apply tracked Prisma migrations; `npm run db:seed -w server` — seed roles/permissions/admin and fictional sample data (`admin / Admin@1234`, development only).
+- `npm run dev` — run API and Vite client together; client defaults to port 5173 and proxies `/api` to the server.
+- `npm run typecheck`, `npm run build`, and `npm test` — root scripts for both workspaces and the integration suite. These commands were verified successfully on 2026-09-26.
+- Tests target a dedicated `personnel_camps_test` PostgreSQL database and run `prisma db push --force-reset`; never point this test configuration at a development or production database containing important data.
 
 ## Non-negotiable rules (from `docs/memory.md` §7)
 

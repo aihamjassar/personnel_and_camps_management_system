@@ -17,7 +17,19 @@ export const createPersonnelSchema = z.object({
   camp_id: z.int().positive().optional(),
 });
 
-export const updatePersonnelSchema = createPersonnelSchema.partial();
+export const updatePersonnelSchema = z.object({
+  full_name: z.string().min(1).max(200).optional(),
+  national_id: z.string().min(1).max(50).nullable().optional(),
+  date_of_birth: z.union([z.null(), z.coerce.date()]).optional(),
+  gender: z.enum(["male", "female"]).nullable().optional(),
+  phone: z.string().max(30).nullable().optional(),
+  email: z.email().max(200).nullable().optional(),
+  rank_id: z.int().positive().nullable().optional(),
+  unit_id: z.int().positive().nullable().optional(),
+  camp_id: z.int().positive().nullable().optional(),
+}).refine((values) => Object.values(values).some((value) => value !== undefined), {
+  message: "At least one personnel field must be provided",
+});
 
 export const statusChangeSchema = z.object({
   status: z.enum(["active", "inactive", "on_leave", "transferred", "discharged"]),

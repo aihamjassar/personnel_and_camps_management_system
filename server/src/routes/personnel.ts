@@ -22,7 +22,7 @@ const includeRefs = {
 } as const;
 
 // GET /api/v1/personnel — list with search/filter/pagination
-personnelRouter.get("/", async (req, res, next) => {
+personnelRouter.get("/", requirePermission("personnel.manage"), async (req, res, next) => {
   try {
     const q = listQuerySchema.parse(req.query);
     const where = {
@@ -174,7 +174,7 @@ personnelRouter.post(
 );
 
 // GET /api/v1/personnel/:id/status — full status history
-personnelRouter.get("/:id/status", async (req, res, next) => {
+personnelRouter.get("/:id/status", requirePermission("personnel.manage"), async (req, res, next) => {
   try {
     const id = Number(req.params.id);
     const items = await prisma.personnelStatus.findMany({

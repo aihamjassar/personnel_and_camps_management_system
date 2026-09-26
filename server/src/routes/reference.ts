@@ -2,7 +2,7 @@ import { Router } from "express";
 import { prisma } from "../lib/prisma.js";
 import { ok } from "../lib/response.js";
 import { writeAudit } from "../lib/audit.js";
-import { authenticate, requirePermission } from "../middleware/auth.js";
+import { authenticate, requireAnyPermission, requirePermission } from "../middleware/auth.js";
 import { validateBody } from "../middleware/validate.js";
 import { HttpError } from "../middleware/error.js";
 import { campSchema, unitSchema, rankSchema, positionSchema, assignmentSchema } from "../validators/schemas.js";
@@ -20,6 +20,7 @@ function simpleCrud<T extends { [K: string]: any }>(opts: {
   };
   idKey: string;
   permission: string;
+  readPermissions?: string[];
   auditTable: string;
   auditType: string;
   createSchema: any;
@@ -27,9 +28,9 @@ function simpleCrud<T extends { [K: string]: any }>(opts: {
   include?: any;
   orderBy?: any;
 }) {
-  const { router, model, idKey, permission, auditTable, auditType, createSchema, include, orderBy } = opts;
+  const { router, model, idKey, permission, readPermissions, auditTable, auditType, createSchema, include, orderBy } = opts;
 
-  router.get("/", requirePermission(permission), async (_req, res, next) => {
+  router.get("/", requireAnyPermission(...(readPermissions ?? [permission])), async (_req, res, next) => {
     try {
       const items = await model.findMany({ include, orderBy: orderBy ?? { [idKey]: "asc" } });
       return ok(res, { items, total: items.length });
@@ -105,6 +106,7 @@ simpleCrud({
   model: prisma.camp,
   idKey: "camp_id",
   permission: "camps.manage",
+  readPermissions: ["camps.manage", "personnel.manage", "units.manage"],
   auditTable: "Camps",
   auditType: "Camp",
   createSchema: campSchema,
@@ -119,6 +121,7 @@ simpleCrud({
   model: prisma.organizationalUnit,
   idKey: "unit_id",
   permission: "units.manage",
+  readPermissions: ["units.manage", "personnel.manage", "assignments.manage", "positions.manage"],
   auditTable: "OrganizationalUnits",
   auditType: "OrganizationalUnit",
   createSchema: unitSchema,
@@ -134,6 +137,7 @@ simpleCrud({
   model: prisma.rank,
   idKey: "rank_id",
   permission: "ranks.manage",
+  readPermissions: ["ranks.manage", "personnel.manage"],
   auditTable: "Ranks",
   auditType: "Rank",
   createSchema: rankSchema,
@@ -148,6 +152,7 @@ simpleCrud({
   model: prisma.position,
   idKey: "position_id",
   permission: "positions.manage",
+  readPermissions: ["positions.manage", "personnel.manage", "assignments.manage"],
   auditTable: "Positions",
   auditType: "Position",
   createSchema: positionSchema,
