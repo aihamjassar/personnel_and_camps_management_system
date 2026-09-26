@@ -1,6 +1,6 @@
 import type { ApiEnvelope } from "./types";
 
-const API_BASE = "/api/v1";
+const API_BASE = IMPORT.META.env.VITE_API_URL;
 
 export class ApiError extends Error {
   status: number;
