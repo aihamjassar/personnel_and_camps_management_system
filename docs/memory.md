@@ -158,3 +158,4 @@ Phase 1 مكتملة، ونُفّذ الجانب البرمجي الأساسي �
 - أُنشئت `server/src/integration/transfers.ts` و`server/src/integration/assignments.ts`، ومسارا `/api/v1/transfers` و`/api/v1/roles`، وصفحتا RTL للانتقالات والأدوار والصلاحيات.
 - تغطي الاختبارات النقل الناجح وامتلاء السعة وعدم تطابق الوحدة وسباق طلبين على سعة مقعد واحد، رفض RBAC والتغيير الفوري للصلاحية، حماية آخر مدير نظام، ومحدد تسجيل الدخول.
 - راجع `docs/Todo-Phase-2.md`؛ مراجعة الكود المشتركة البشرية/الفريقية ما زالت مطلوبة.
+- نُقل إعداد seed من الخاصية القديمة `server/package.json#prisma` إلى `server/prisma.config.ts` (Prisma 6.19.3)، وأصبح `npm run db:seed -w server` يستدعي `prisma db seed`؛ اختُبر الأمر على قاعدة الاختبار المنفصلة دون تحذير الإعداد القديم.
