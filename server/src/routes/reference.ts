@@ -6,6 +6,7 @@ import { authenticate, requireAnyPermission, requirePermission } from "../middle
 import { validateBody } from "../middleware/validate.js";
 import { HttpError } from "../middleware/error.js";
 import { campSchema, unitSchema, rankSchema, positionSchema, assignmentSchema } from "../validators/schemas.js";
+import { createAssignment } from "../integration/assignments.js";
 
 // Generic CRUD helper for the simple Phase 1 reference tables
 // (camps, units, ranks, positions): same envelope, same audit events, same RBAC.
@@ -106,7 +107,7 @@ simpleCrud({
   model: prisma.camp,
   idKey: "camp_id",
   permission: "camps.manage",
-  readPermissions: ["camps.manage", "personnel.manage", "units.manage"],
+  readPermissions: ["camps.manage", "personnel.manage", "units.manage", "transfers.manage"],
   auditTable: "Camps",
   auditType: "Camp",
   createSchema: campSchema,
@@ -121,7 +122,7 @@ simpleCrud({
   model: prisma.organizationalUnit,
   idKey: "unit_id",
   permission: "units.manage",
-  readPermissions: ["units.manage", "personnel.manage", "assignments.manage", "positions.manage"],
+  readPermissions: ["units.manage", "personnel.manage", "assignments.manage", "positions.manage", "transfers.manage"],
   auditTable: "OrganizationalUnits",
   auditType: "OrganizationalUnit",
   createSchema: unitSchema,
@@ -186,32 +187,7 @@ assignmentsRouter.post(
   validateBody(assignmentSchema),
   async (req, res, next) => {
     try {
-      const { personnel_id, unit_id, position_id, start_date, end_date, notes } = req.body;
-      const created = await prisma.$transaction(async (tx) => {
-        // Close any open assignment for this person first — one current at a time.
-        await tx.assignment.updateMany({
-          where: { personnel_id, end_date: null },
-          data: { end_date: start_date ?? new Date() },
-        });
-        const row = await tx.assignment.create({
-          data: { personnel_id, unit_id, position_id, start_date, end_date: end_date ?? null, notes },
-          include: {
-            personnel: { select: { personnel_id: true, full_name: true } },
-            unit: { select: { unit_id: true, name: true } },
-            position: { select: { position_id: true, name: true } },
-          },
-        });
-        await tx.personnel.update({ where: { personnel_id }, data: { unit_id } });
-        return row;
-      });
-      await writeAudit({
-        userId: req.user!.userId,
-        actionType: "AssignmentCreated",
-        targetTable: "Assignments",
-        targetId: created.assignment_id,
-        newValue: created,
-        ipAddress: req.ip,
-      });
+      const created = await createAssignment({ ...req.body, user_id: req.user!.userId, ip_address: req.ip });
       return ok(res, created, 201);
     } catch (err) {
       next(err);

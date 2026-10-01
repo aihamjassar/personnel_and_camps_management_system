@@ -9,6 +9,8 @@ import { campsRouter, unitsRouter, ranksRouter, positionsRouter, assignmentsRout
 import { usersRouter } from "./routes/users.js";
 import { reportsRouter } from "./routes/reports.js";
 import { auditRouter } from "./routes/audit.js";
+import { transfersRouter } from "./routes/transfers.js";
+import { rolesRouter } from "./routes/roles.js";
 import { fail } from "./lib/response.js";
 import { authenticate, requirePermission } from "./middleware/auth.js";
 
@@ -30,7 +32,9 @@ export function createApp() {
   app.use("/api/v1/ranks", ranksRouter);
   app.use("/api/v1/positions", positionsRouter);
   app.use("/api/v1/assignments", assignmentsRouter);
+  app.use("/api/v1/transfers", transfersRouter);
   app.use("/api/v1/users", usersRouter);
+  app.use("/api/v1/roles", rolesRouter);
   app.use("/api/v1/reports", reportsRouter);
   app.use("/api/v1/audit", auditRouter);
 

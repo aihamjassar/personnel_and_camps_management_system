@@ -6,7 +6,7 @@ import { prisma } from "../lib/prisma.js";
 import { env } from "../config/env.js";
 import { ok, fail } from "../lib/response.js";
 import { writeAudit } from "../lib/audit.js";
-import { authenticate } from "../middleware/auth.js";
+import { authenticate, requireAnyPermission } from "../middleware/auth.js";
 import { validateBody } from "../middleware/validate.js";
 import { loginSchema } from "../validators/schemas.js";
 
@@ -63,6 +63,9 @@ authRouter.post("/login", loginLimiter, validateBody(loginSchema), async (req, r
 });
 
 // Session restore for the SPA — returns the current user from a valid token.
-authRouter.get("/me", authenticate, async (req, res) => {
+authRouter.get("/me", authenticate, requireAnyPermission(
+  "personnel.manage", "camps.manage", "units.manage", "ranks.manage", "positions.manage",
+  "assignments.manage", "transfers.manage", "users.manage", "reports.view", "audit.view", "system.admin",
+), async (req, res) => {
   return ok(res, { user: req.user });
 });

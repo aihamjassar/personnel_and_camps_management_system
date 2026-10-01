@@ -20,8 +20,8 @@ const PERMISSIONS = [
 
 const ROLES = [
   { role_name: "System Administrator", description: "Full access", all: true },
-  { role_name: "Personnel Officer", description: "Manages personnel, assignments, ranks", perms: ["personnel.manage", "ranks.manage", "positions.manage", "assignments.manage", "reports.view"] },
-  { role_name: "Camp Manager", description: "Manages own camp units and personnel status", perms: ["camps.manage", "units.manage", "personnel.manage", "reports.view"] },
+  { role_name: "Personnel Officer", description: "Manages personnel, assignments, ranks, and academic transfers", perms: ["personnel.manage", "ranks.manage", "positions.manage", "assignments.manage", "transfers.manage", "reports.view"] },
+  { role_name: "Camp Manager", description: "Manages camp units, personnel status, and academic transfers", perms: ["camps.manage", "units.manage", "personnel.manage", "transfers.manage", "reports.view"] },
   { role_name: "Report Viewer", description: "Read-only reports", perms: ["reports.view"] },
 ];
 

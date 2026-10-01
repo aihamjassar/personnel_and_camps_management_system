@@ -96,3 +96,18 @@ export const updateUserSchema = z.object({
 }).refine((values) => Object.values(values).some((value) => value !== undefined), {
   message: "At least one user field must be provided",
 });
+
+export const transferSchema = z.object({
+  personnel_id: z.int().positive(),
+  camp_from_id: z.int().positive(),
+  camp_to_id: z.int().positive(),
+  unit_to_id: z.int().positive(),
+  reason: z.string().trim().max(1000).optional(),
+}).refine((value) => value.camp_from_id !== value.camp_to_id, {
+  message: "Source and destination camps must be different",
+  path: ["camp_to_id"],
+});
+
+export const rolePermissionsSchema = z.object({
+  permission_ids: z.array(z.int().positive()).max(100),
+});

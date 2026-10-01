@@ -10,6 +10,7 @@ import {
   UsersRound,
   BriefcaseBusiness,
   Medal,
+  ArrowLeftRight,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 
@@ -21,7 +22,9 @@ const links = [
   { to: "/app/ranks", label: "الرتب", permission: "ranks.manage", icon: Medal },
   { to: "/app/positions", label: "المناصب", permission: "positions.manage", icon: BriefcaseBusiness },
   { to: "/app/assignments", label: "التعيينات", permission: "assignments.manage", icon: ClipboardList },
+  { to: "/app/transfers", label: "الانتقالات", permission: "transfers.manage", icon: ArrowLeftRight },
   { to: "/app/users", label: "المستخدمون", permission: "users.manage", icon: ShieldCheck },
+  { to: "/app/roles", label: "الأدوار والصلاحيات", permission: "users.manage", icon: ShieldCheck },
 ];
 
 export default function AppLayout() {

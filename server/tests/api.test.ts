@@ -25,6 +25,7 @@ beforeAll(async () => {
       { permission_key: "ranks.manage" },
       { permission_key: "positions.manage" },
       { permission_key: "assignments.manage" },
+      { permission_key: "transfers.manage" },
       { permission_key: "reports.view" },
       { permission_key: "users.manage" },
       { permission_key: "system.admin" },
@@ -84,6 +85,13 @@ describe("auth", () => {
     const res = await request(app).get("/api/v1/auth/me").set("Authorization", `Bearer ${adminToken}`);
     expect(res.status).toBe(200);
     expect(res.body).toMatchObject({ status: "success", error: null });
+  });
+
+  it("denies session restoration to an authenticated account with no permissions", async () => {
+    await prisma.user.create({ data: { username: "no_permissions", password_hash: await bcrypt.hash("NoPerm@12345", 10), full_name: "No Permissions" } });
+    const token = await login("no_permissions", "NoPerm@12345");
+    const res = await request(app).get("/api/v1/auth/me").set("Authorization", `Bearer ${token}`);
+    expect(res.status).toBe(403);
   });
 
     it("rejects requests without a token", async () => {
@@ -263,6 +271,8 @@ describe("Phase 1 reference data and assignments", () => {
     expect(assignments.body.data.items.filter((item: { personnel_id: number; end_date: string | null }) => item.personnel_id === personnelId && item.end_date === null)).toHaveLength(1);
     const persistedPerson = await prisma.personnel.findUniqueOrThrow({ where: { personnel_id: personnelId } });
     expect(persistedPerson.unit_id).toBe(unit2.unit_id);
+    expect(persistedPerson.camp_id).toBe(camp2.camp_id);
+    expect(await prisma.auditLog.count({ where: { action_type: "AssignmentCreated", target_id: second.body.data.assignment_id } })).toBe(1);
   });
 });
 
@@ -299,6 +309,104 @@ describe("RBAC coverage", () => {
     expect(officer.status).toBe(403);
     const admin = await request(app).get("/api/v1/health").set("Authorization", `Bearer ${adminToken}`);
     expect(admin.status).toBe(200);
+  });
+
+  it("denies transfer and role administration routes to accounts without their permissions", async () => {
+    for (const [method, endpoint] of [["get", "/api/v1/transfers"], ["get", "/api/v1/transfers/eligible-personnel"], ["post", "/api/v1/transfers"], ["get", "/api/v1/roles"], ["get", "/api/v1/roles/permissions"]] as const) {
+      const res = await request(app)[method](endpoint).set("Authorization", `Bearer ${viewerToken}`).send({});
+      expect(res.status, `${method.toUpperCase()} ${endpoint}`).toBe(403);
+    }
+    const officerTransfer = await request(app).get("/api/v1/transfers").set("Authorization", `Bearer ${officerToken}`);
+    expect(officerTransfer.status).toBe(403);
+  });
+});
+
+describe("Phase 2 transfers", () => {
+  it("moves a person and writes transfer plus audit atomically", async () => {
+    const source = await prisma.camp.create({ data: { name: "Transfer Source Camp", capacity: 10 } });
+    const destination = await prisma.camp.create({ data: { name: "Transfer Destination Camp", capacity: 2 } });
+    const sourceUnit = await prisma.organizationalUnit.create({ data: { name: "Transfer Source Unit", camp_id: source.camp_id } });
+    const destinationUnit = await prisma.organizationalUnit.create({ data: { name: "Transfer Destination Unit", camp_id: destination.camp_id } });
+    const personRes = await request(app).post("/api/v1/personnel").set("Authorization", `Bearer ${adminToken}`).send({ full_name: "Transfer Academic Person", camp_id: source.camp_id, unit_id: sourceUnit.unit_id });
+    expect(personRes.status).toBe(201);
+    const personnelId = personRes.body.data.personnel_id as number;
+
+    const transfer = await request(app).post("/api/v1/transfers").set("Authorization", `Bearer ${adminToken}`).send({
+      personnel_id: personnelId,
+      camp_from_id: source.camp_id,
+      camp_to_id: destination.camp_id,
+      unit_to_id: destinationUnit.unit_id,
+      reason: "Academic test transfer",
+    });
+    expect(transfer.status).toBe(201);
+    expect(transfer.body.data.transfer).toMatchObject({ status: "completed", camp_from_id: source.camp_id, camp_to_id: destination.camp_id });
+    expect(transfer.body.data.personnel).toMatchObject({ camp_id: destination.camp_id, unit_id: destinationUnit.unit_id });
+    expect(await prisma.transfer.count({ where: { personnel_id: personnelId } })).toBe(1);
+    expect(await prisma.auditLog.count({ where: { action_type: "PersonnelTransferred", target_id: transfer.body.data.transfer.transfer_id } })).toBe(1);
+
+    const fullCamp = await prisma.camp.create({ data: { name: "Transfer Full Camp", capacity: 1 } });
+    const fullUnit = await prisma.organizationalUnit.create({ data: { name: "Transfer Full Unit", camp_id: fullCamp.camp_id } });
+    const occupant = await prisma.personnel.create({ data: { full_name: "Synthetic Occupant", camp_id: fullCamp.camp_id } });
+    const failure = await request(app).post("/api/v1/transfers").set("Authorization", `Bearer ${adminToken}`).send({
+      personnel_id: personnelId,
+      camp_from_id: destination.camp_id,
+      camp_to_id: fullCamp.camp_id,
+      unit_to_id: fullUnit.unit_id,
+      reason: "Should be rejected because full",
+    });
+    expect(failure.status).toBe(409);
+    expect(failure.body.error.message).toContain("capacity");
+    expect((await prisma.personnel.findUniqueOrThrow({ where: { personnel_id: personnelId } })).camp_id).toBe(destination.camp_id);
+    expect(await prisma.transfer.count({ where: { personnel_id: personnelId } })).toBe(1);
+    expect(await prisma.auditLog.count({ where: { action_type: "PersonnelTransferRejected", target_id: personnelId } })).toBe(1);
+
+    const invalidUnit = await request(app).post("/api/v1/transfers").set("Authorization", `Bearer ${adminToken}`).send({
+      personnel_id: personnelId, camp_from_id: destination.camp_id, camp_to_id: source.camp_id, unit_to_id: fullUnit.unit_id,
+    });
+    expect(invalidUnit.status).toBe(400);
+    expect(await prisma.personnel.count({ where: { personnel_id: personnelId, camp_id: destination.camp_id } })).toBe(1);
+    expect(await prisma.personnel.findUniqueOrThrow({ where: { personnel_id: occupant.personnel_id } })).not.toBeNull();
+
+    const raceSource = await prisma.camp.create({ data: { name: "Transfer Race Source", capacity: 5 } });
+    const raceDestination = await prisma.camp.create({ data: { name: "Transfer Race Destination", capacity: 1 } });
+    const raceSourceUnit = await prisma.organizationalUnit.create({ data: { name: "Transfer Race Source Unit", camp_id: raceSource.camp_id } });
+    const raceDestinationUnit = await prisma.organizationalUnit.create({ data: { name: "Transfer Race Destination Unit", camp_id: raceDestination.camp_id } });
+    const racePeople = await Promise.all(["One", "Two"].map((suffix) => prisma.personnel.create({ data: { full_name: `Transfer Race Person ${suffix}`, camp_id: raceSource.camp_id, unit_id: raceSourceUnit.unit_id } })));
+    const concurrent = await Promise.all(racePeople.map((person) => request(app).post("/api/v1/transfers")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ personnel_id: person.personnel_id, camp_from_id: raceSource.camp_id, camp_to_id: raceDestination.camp_id, unit_to_id: raceDestinationUnit.unit_id })));
+    expect(concurrent.map((res) => res.status).sort()).toEqual([201, 409]);
+    expect(await prisma.personnel.count({ where: { camp_id: raceDestination.camp_id } })).toBe(1);
+  });
+});
+
+describe("dynamic role permissions", () => {
+  it("applies permission changes immediately and preserves an active administrator", async () => {
+    const viewerRole = await prisma.role.findUniqueOrThrow({ where: { role_name: "report-viewer-test" } });
+    const personnelPermission = await prisma.permission.findUniqueOrThrow({ where: { permission_key: "personnel.manage" } });
+    const changed = await request(app).put(`/api/v1/roles/${viewerRole.role_id}/permissions`)
+      .set("Authorization", `Bearer ${adminToken}`).send({ permission_ids: [personnelPermission.permission_id] });
+    expect(changed.status).toBe(200);
+    // The token predates this update; auth loads current RBAC rows for every request.
+    const newlyAllowed = await request(app).get("/api/v1/personnel").set("Authorization", `Bearer ${viewerToken}`);
+    expect(newlyAllowed.status).toBe(200);
+
+    const revoked = await request(app).put(`/api/v1/roles/${viewerRole.role_id}/permissions`)
+      .set("Authorization", `Bearer ${adminToken}`).send({ permission_ids: [] });
+    expect(revoked.status).toBe(200);
+    const newlyDenied = await request(app).get("/api/v1/personnel").set("Authorization", `Bearer ${viewerToken}`);
+    expect(newlyDenied.status).toBe(403);
+
+    const adminRole = await prisma.role.findUniqueOrThrow({ where: { role_name: "admin-test" } });
+    const noAdminPermission = await request(app).put(`/api/v1/roles/${adminRole.role_id}/permissions`)
+      .set("Authorization", `Bearer ${adminToken}`).send({ permission_ids: [personnelPermission.permission_id] });
+    expect(noAdminPermission.status).toBe(409);
+    const adminUser = await prisma.user.findUniqueOrThrow({ where: { username: "admin_t" } });
+    const disableLastAdmin = await request(app).put(`/api/v1/users/${adminUser.user_id}`)
+      .set("Authorization", `Bearer ${adminToken}`).send({ is_active: false });
+    expect(disableLastAdmin.status).toBe(409);
+    expect((await prisma.user.findUniqueOrThrow({ where: { user_id: adminUser.user_id } })).is_active).toBe(true);
+    expect(await prisma.auditLog.count({ where: { action_type: "RolePermissionsChanged", target_id: viewerRole.role_id } })).toBe(2);
   });
 });
 
@@ -359,5 +467,15 @@ describe("audit", () => {
       .set("Authorization", `Bearer ${adminToken}`);
     expect(personnelEvents.status).toBe(200);
     expect(personnelEvents.body.data.items.some((item: { action_type: string }) => item.action_type === "PersonnelCreated")).toBe(true);
+  });
+
+  it("enforces the configured login rate limit after repeated failed attempts", async () => {
+    const attempts = await Promise.all(Array.from({ length: 21 }, () => request(app)
+      .post("/api/v1/auth/login")
+      .set("X-Forwarded-For", "198.51.100.77")
+      .send({ username: "missing_rate_test", password: "not-correct" })));
+    expect(attempts.slice(0, 20).every((res) => res.status === 401)).toBe(true);
+    expect(attempts[20].status).toBe(429);
+    expect(attempts[20].body.status).toBe("fail");
   });
 });
