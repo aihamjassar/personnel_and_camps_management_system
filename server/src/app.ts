@@ -19,7 +19,7 @@ export function createApp() {
   app.use(cors({ origin: env.clientOrigin, credentials: true }));
   app.use(express.json({ limit: "1mb" }));
 
-  app.get("/api/v1/health", authenticate, requirePermission("system.admin"), (_req, res) =>
+  app.get("/api/v1/health", (_req, res) =>
     res.json({ status: "success", data: { ok: true }, error: null }),
   );
 
