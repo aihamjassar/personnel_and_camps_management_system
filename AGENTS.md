@@ -32,7 +32,7 @@
 - `PersonnelStatus` is **append-only history** — never overwrite old rows.
 - Transfers between camps must run in a **single DB transaction** (no partial states).
 - Audit logging happens in the **integration layer**, never triggered from the frontend UI.
-- **Every** API endpoint enforces RBAC — no exceptions, even for seemingly harmless routes.
+- Every API endpoint enforces RBAC except public `POST /api/v1/auth/login` and minimal `GET /api/v1/health` liveness check; the health response must not expose sensitive details. See `docs/memory.md` §2 and §7.
 - Architectural changes must be recorded in `docs/memory.md` §2 *before* implementing.
 
 ## Architecture (verified against `docs/Architecture.md`)

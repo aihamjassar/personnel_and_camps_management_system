@@ -302,11 +302,12 @@ describe("RBAC coverage", () => {
     expect(assignmentsDeniedForOfficer.status).toBe(403);
   });
 
-  it("restricts health status to authenticated system administrators", async () => {
+  it("exposes only minimal health status publicly", async () => {
     const anonymous = await request(app).get("/api/v1/health");
-    expect(anonymous.status).toBe(401);
+    expect(anonymous.status).toBe(200);
+    expect(anonymous.body).toEqual({ status: "success", data: { ok: true }, error: null });
     const officer = await request(app).get("/api/v1/health").set("Authorization", `Bearer ${officerToken}`);
-    expect(officer.status).toBe(403);
+    expect(officer.status).toBe(200);
     const admin = await request(app).get("/api/v1/health").set("Authorization", `Bearer ${adminToken}`);
     expect(admin.status).toBe(200);
   });
