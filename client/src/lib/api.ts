@@ -55,8 +55,30 @@ export const api = {
     apiRequest<T>(path, { method: "POST", body: JSON.stringify(body) }),
   put: <T,>(path: string, body: unknown) =>
     apiRequest<T>(path, { method: "PUT", body: JSON.stringify(body) }),
+  patch: <T,>(path: string, body?: unknown) =>
+    apiRequest<T>(path, { method: "PATCH", ...(body !== undefined ? { body: JSON.stringify(body) } : {}) }),
   delete: <T,>(path: string) => apiRequest<T>(path, { method: "DELETE" }),
 };
+
+export async function downloadReport(format: "xlsx" | "pdf"): Promise<void> {
+  const token = sessionStorage.getItem("personnel.session.token");
+  const API_BASE = import.meta.env.VITE_API_URL;
+  const response = await fetch(`${API_BASE}/reports/export?format=${format}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+  });
+  if (!response.ok) {
+    throw new ApiError("تعذّر تصدير التقرير.", response.status);
+  }
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = format === "xlsx" ? "report-summary.xlsx" : "report-summary.pdf";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
 
 export function queryString(values: Record<string, string | number | undefined>) {
   const params = new URLSearchParams();

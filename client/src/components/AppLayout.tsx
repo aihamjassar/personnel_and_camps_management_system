@@ -10,6 +10,7 @@ import {
   UsersRound,
   BriefcaseBusiness,
   Medal,
+  Bell,
   ArrowLeftRight,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
@@ -25,11 +26,13 @@ const links = [
   { to: "/app/transfers", label: "الانتقالات", permission: "transfers.manage", icon: ArrowLeftRight },
   { to: "/app/users", label: "المستخدمون", permission: "users.manage", icon: ShieldCheck },
   { to: "/app/roles", label: "الأدوار والصلاحيات", permission: "users.manage", icon: ShieldCheck },
+  { to: "/app/audit", label: "سجل التدقيق", permission: "system.admin", icon: ClipboardList },
+  { to: "/app/notifications", label: "الإشعارات", permission: "", icon: Bell },
 ];
 
 export default function AppLayout() {
   const { user, signOut, can } = useAuth();
-  const visibleLinks = links.filter((item) => can(item.permission));
+  const visibleLinks = links.filter((item) => !item.permission || can(item.permission));
 
   return (
     <div className="min-h-screen bg-paper text-ink lg:flex">

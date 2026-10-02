@@ -4,6 +4,7 @@ import { ok } from "../lib/response.js";
 import { authenticate, requirePermission } from "../middleware/auth.js";
 import { validateBody } from "../middleware/validate.js";
 import { HttpError } from "../middleware/error.js";
+import { notifyPermissionHolders } from "../lib/notifications.js";
 import { rolePermissionsSchema } from "../validators/schemas.js";
 
 export const rolesRouter = Router();
@@ -73,6 +74,13 @@ rolesRouter.put("/:id/permissions", requirePermission("users.manage"), validateB
         include: { permissions: { include: { permission: true } }, _count: { select: { users: true } } },
       });
     });
+    // FR-15: confirmation copy to system administrators (Flow-of-Event.md §5).
+    await notifyPermissionHolders(
+      "system.admin",
+      "تغيير صلاحيات دور",
+      `حدّث مستخدم رقم ${req.user!.userId} صلاحيات الدور رقم ${roleId}.`,
+      req.user!.userId,
+    );
     return ok(res, result);
   } catch (err) {
     next(err);

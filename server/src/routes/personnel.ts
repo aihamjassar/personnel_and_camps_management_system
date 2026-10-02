@@ -5,6 +5,7 @@ import { writeAudit } from "../lib/audit.js";
 import { authenticate, requirePermission } from "../middleware/auth.js";
 import { validateBody } from "../middleware/validate.js";
 import { HttpError } from "../middleware/error.js";
+import { notifyPermissionHolders } from "../lib/notifications.js";
 import {
   createPersonnelSchema,
   updatePersonnelSchema,
@@ -138,6 +139,10 @@ personnelRouter.delete(
   },
 );
 
+// PersonnelStatus values that must trigger an FR-15 notification
+// (e.g. "discharged" / "منتهي الخدمة" per Flow-of-Event.md §5).
+const SENSITIVE_STATUSES = new Set(["discharged", "inactive"]);
+
 // POST /api/v1/personnel/:id/status — append-only status history (FR-04)
 personnelRouter.post(
   "/:id/status",
@@ -166,6 +171,22 @@ personnelRouter.post(
         newValue: { status, notes },
         ipAddress: req.ip,
       });
+      // FR-15: sensitive status changes notify personnel officers and camp managers.
+      if (SENSITIVE_STATUSES.has(status)) {
+        const label = status === "discharged" ? "منتهي الخدمة" : status;
+        await notifyPermissionHolders(
+          "personnel.manage",
+          "تغيير حالة حساس",
+          `غيّر مستخدم رقم ${req.user!.userId} حالة الفرد رقم ${id} إلى "${label}".`,
+          req.user!.userId,
+        );
+        await notifyPermissionHolders(
+          "camps.manage",
+          "تغيير حالة حساس في فرد",
+          `غيّر مستخدم رقم ${req.user!.userId} حالة الفرد رقم ${id} إلى "${label}".`,
+          req.user!.userId,
+        );
+      }
       return ok(res, history, 201);
     } catch (err) {
       next(err);

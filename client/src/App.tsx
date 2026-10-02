@@ -9,6 +9,8 @@ import AssignmentsPage from "./pages/AssignmentsPage";
 import UsersPage from "./pages/UsersPage";
 import TransfersPage from "./pages/TransfersPage";
 import RolesPage from "./pages/RolesPage";
+import AuditPage from "./pages/AuditPage";
+import NotificationsPage from "./pages/NotificationsPage";
 
 function SessionGate() {
   const { user, loading } = useAuth();
@@ -55,6 +57,8 @@ export default function App() {
           <Route path="transfers" element={<PermissionGate permission="transfers.manage"><TransfersPage /></PermissionGate>} />
           <Route path="users" element={<PermissionGate permission="users.manage"><UsersPage /></PermissionGate>} />
           <Route path="roles" element={<PermissionGate permission="users.manage"><RolesPage /></PermissionGate>} />
+          <Route path="audit" element={<PermissionGate permission="system.admin"><AuditPage /></PermissionGate>} />
+          <Route path="notifications" element={<NotificationsPage />} />
         </Route>
       </Route>
       <Route path="/" element={<Navigate to="/app" replace />} />

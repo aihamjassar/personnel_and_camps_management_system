@@ -480,3 +480,81 @@ describe("audit", () => {
     expect(attempts[20].body.status).toBe("fail");
   });
 });
+
+describe("Phase 3 advanced features", () => {
+  it("notifies the requester on transfer accept/reject and officers on sensitive status changes", async () => {
+    const source = await prisma.camp.create({ data: { name: "Phase3 Source Camp", capacity: 10 } });
+    const destination = await prisma.camp.create({ data: { name: "Phase3 Destination Camp", capacity: 10 } });
+    const unit = await prisma.organizationalUnit.create({ data: { name: "Phase3 Unit", camp_id: destination.camp_id } });
+    const person = await prisma.personnel.create({ data: { full_name: "Phase3 Person", camp_id: source.camp_id } });
+
+    const failed = await request(app).post("/api/v1/transfers").set("Authorization", `Bearer ${adminToken}`).send({
+      personnel_id: person.personnel_id,
+      camp_from_id: source.camp_id,
+      camp_to_id: destination.camp_id,
+      unit_to_id: (await prisma.organizationalUnit.create({ data: { name: "Wrong Unit", camp_id: source.camp_id } })).unit_id,
+    });
+    expect(failed.status).toBe(400);
+
+    const accepted = await request(app).post("/api/v1/transfers").set("Authorization", `Bearer ${adminToken}`).send({
+      personnel_id: person.personnel_id,
+      camp_from_id: source.camp_id,
+      camp_to_id: destination.camp_id,
+      unit_to_id: unit.unit_id,
+    });
+    expect(accepted.status).toBe(201);
+
+    const adminUser = await prisma.user.findUniqueOrThrow({ where: { username: "admin_t" } });
+    const adminNotifications = await prisma.notification.findMany({ where: { user_id: adminUser.user_id } });
+    expect(adminNotifications.some((n) => n.title === "رُفض طلب النقل")).toBe(true);
+    expect(adminNotifications.some((n) => n.title === "تم قبول طلب النقل")).toBe(true);
+
+    const personId = person.personnel_id;
+    const statusChange = await request(app)
+      .post(`/api/v1/personnel/${personId}/status`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ status: "discharged", notes: "synthetic sensitive status" });
+    expect(statusChange.status).toBe(201);
+
+    const officerUser = await prisma.user.findUniqueOrThrow({ where: { username: "officer_t" } });
+    const officerNotifications = await prisma.notification.findMany({ where: { user_id: officerUser.user_id } });
+    expect(officerNotifications.some((n) => n.title === "تغيير حالة حساس")).toBe(true);
+  });
+
+  it("lists and marks notifications read for the current user only", async () => {
+    const anonymous = await request(app).get("/api/v1/notifications");
+    expect(anonymous.status).toBe(401);
+
+    const officerTokenReq = await request(app).get("/api/v1/notifications").set("Authorization", `Bearer ${officerToken}`);
+    expect(officerTokenReq.status).toBe(200);
+    expect(officerTokenReq.body.data.items.length).toBeGreaterThan(0);
+    const first = officerTokenReq.body.data.items[0];
+    const mark = await request(app).patch(`/api/v1/notifications/${first.notification_id}/read`).set("Authorization", `Bearer ${officerToken}`);
+    expect(mark.status).toBe(200);
+    const markAll = await request(app).patch("/api/v1/notifications/read-all").set("Authorization", `Bearer ${officerToken}`);
+    expect(markAll.status).toBe(200);
+    const after = await request(app).get("/api/v1/notifications?unread=true").set("Authorization", `Bearer ${officerToken}`);
+    expect(after.body.data.items.length).toBe(0);
+  });
+
+  it("exports the summary report as Excel and PDF", async () => {
+    const xlsx = await request(app).get("/api/v1/reports/export?format=xlsx").set("Authorization", `Bearer ${adminToken}`).buffer(true).parse((res, cb) => { const chunks: Buffer[] = []; res.on("data", (c: Buffer) => chunks.push(c)); res.on("end", () => cb(null, Buffer.concat(chunks))); });
+    expect(xlsx.status).toBe(200);
+    expect(xlsx.headers["content-type"]).toContain("spreadsheetml");
+    expect((xlsx.body as Buffer).subarray(0, 2).toString()).toBe("PK");
+
+    const pdf = await request(app).get("/api/v1/reports/export?format=pdf").set("Authorization", `Bearer ${adminToken}`).buffer(true).parse((res, cb) => { const chunks: Buffer[] = []; res.on("data", (c: Buffer) => chunks.push(c)); res.on("end", () => cb(null, Buffer.concat(chunks))); });
+    expect(pdf.status).toBe(200);
+    expect(pdf.headers["content-type"]).toContain("application/pdf");
+    expect((pdf.body as Buffer).subarray(0, 5).toString()).toBe("%PDF-");
+
+    const bad = await request(app).get("/api/v1/reports/export?format=doc").set("Authorization", `Bearer ${adminToken}`);
+    expect(bad.status).toBe(400);
+
+    const exported = await request(app).get("/api/v1/audit?action_type=ReportExported").set("Authorization", `Bearer ${adminToken}`);
+    expect(exported.body.data.items.length).toBeGreaterThan(0);
+
+    const viewerDenied = await request(app).get("/api/v1/reports/export?format=xlsx").set("Authorization", `Bearer ${officerToken}`);
+    expect(viewerDenied.status).toBe(403);
+  });
+});
