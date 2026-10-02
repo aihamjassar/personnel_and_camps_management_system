@@ -1,13 +1,10 @@
 import { execSync } from "node:child_process";
-
-// Tests run against a dedicated database, never the dev one.
-const TEST_URL =
-  "postgresql://postgres:admin@127.0.0.1:5432/personnel_camps_test?schema=public";
+import { TEST_DATABASE_URL } from "./test-db-url.js";
 
 export default function setup() {
-  process.env.DATABASE_URL = TEST_URL;
+  process.env.DATABASE_URL = TEST_DATABASE_URL;
   execSync("npx prisma db push --skip-generate --force-reset", {
     stdio: "inherit",
-    env: { ...process.env, DATABASE_URL: TEST_URL },
+    env: { ...process.env, DATABASE_URL: TEST_DATABASE_URL },
   });
 }

@@ -1,9 +1,9 @@
 import { beforeAll } from "vitest";
+import { TEST_DATABASE_URL } from "./test-db-url.js";
 
 // Must run before app modules load: dotenv won't override an existing DATABASE_URL,
 // so pinning it here routes Prisma to the test database.
-process.env.DATABASE_URL =
-  "postgresql://postgres:admin@127.0.0.1:5432/personnel_camps_test?schema=public";
+process.env.DATABASE_URL = TEST_DATABASE_URL;
 
 beforeAll(async () => {
   const { prisma } = await import("../src/lib/prisma.js");
