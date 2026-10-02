@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
-import { Activity, Building2, UsersRound, UserRoundCheck, RefreshCw } from "lucide-react";
-import { api, ApiError } from "../lib/api";
+import { Activity, Building2, UsersRound, UserRoundCheck, RefreshCw, FileDown, FileSpreadsheet } from "lucide-react";
+import { api, ApiError, downloadReport } from "../lib/api";
 import type { Summary } from "../lib/types";
 import { DataState, MetricCard, PageHeader, Panel } from "../components/ui";
 
@@ -25,9 +25,20 @@ export default function DashboardPage() {
 
   useEffect(() => { void load(); }, [load]);
 
+  const [exportError, setExportError] = useState<string | null>(null);
+  async function exportAs(format: "xlsx" | "pdf") {
+    setExportError(null);
+    try {
+      await downloadReport(format);
+    } catch (err) {
+      setExportError(err instanceof Error ? err.message : "تعذّر تصدير التقرير.");
+    }
+  }
+
   return (
     <>
-      <PageHeader title="لوحة التحكم" subtitle="نظرة سريعة على السجلات الإدارية المسجلة في النظام." action={<button onClick={() => void load()} className="inline-flex min-h-10 items-center gap-2 self-start rounded-xl border border-line bg-white px-4 text-sm font-bold text-slate-600 hover:bg-slate-50"><RefreshCw size={16} />تحديث البيانات</button>} />
+      <PageHeader title="لوحة التحكم" subtitle="نظرة سريعة على السجلات الإدارية المسجلة في النظام." action={<div className="flex flex-wrap items-center gap-2"><button onClick={() => void load()} className="inline-flex min-h-10 items-center gap-2 self-start rounded-xl border border-line bg-white px-4 text-sm font-bold text-slate-600 hover:bg-slate-50"><RefreshCw size={16} />تحديث البيانات</button><button onClick={() => void exportAs("xlsx")} className="inline-flex min-h-10 items-center gap-2 self-start rounded-xl border border-line bg-white px-4 text-sm font-bold text-slate-600 hover:bg-slate-50"><FileSpreadsheet size={16} />تصدير Excel</button><button onClick={() => void exportAs("pdf")} className="inline-flex min-h-10 items-center gap-2 self-start rounded-xl border border-line bg-white px-4 text-sm font-bold text-slate-600 hover:bg-slate-50"><FileDown size={16} />تصدير PDF</button></div>} />
+      {exportError && <div role="alert" className="mb-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">{exportError}</div>}
       <DataState loading={loading} error={error} empty={!summary} onRetry={() => void load()}>
         {summary && <div className="space-y-6">
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">

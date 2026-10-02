@@ -1,6 +1,7 @@
 import { HttpError } from "../middleware/error.js";
 import { prisma } from "../lib/prisma.js";
 import { writeAudit } from "../lib/audit.js";
+import { createNotifications, notifyPermissionHolders } from "../lib/notifications.js";
 
 export interface TransferInput {
   personnel_id: number;
@@ -15,7 +16,14 @@ export interface TransferInput {
 /** Coordinates the personnel, camp/unit, transfer, and audit modules in one DB transaction. */
 export async function executeTransfer(input: TransferInput) {
   try {
-    return await prisma.$transaction(async (tx) => {
+    // FR-15: notify on submission before the atomic transaction runs.
+    await notifyPermissionHolders(
+      "transfers.manage",
+      "طلب انتقال جديد",
+      `قدّم مستخدم رقم ${input.user_id} طلب نقل للفرد رقم ${input.personnel_id} إلى معسكر ${input.camp_to_id}.`,
+      input.user_id,
+    );
+    const result = await prisma.$transaction(async (tx) => {
     // Lock the person so two concurrent requests cannot transfer the same record twice.
     await tx.$queryRaw<Array<{ personnel_id: number }>>`SELECT personnel_id FROM personnel WHERE personnel_id = ${input.personnel_id} FOR UPDATE`;
 
@@ -83,6 +91,20 @@ export async function executeTransfer(input: TransferInput) {
     });
     return { transfer, personnel: updatedPerson };
     }, { maxWait: 5000, timeout: 10000 });
+
+    // Notifications (FR-15): announced to transfers holders on submit, result to requester.
+    await notifyPermissionHolders(
+      "transfers.manage",
+      "تم قبول طلب انتقال",
+      `تم نقل الفرد رقم ${input.personnel_id} من معسكر ${input.camp_from_id} إلى معسكر ${input.camp_to_id}.`,
+      input.user_id,
+    );
+    await createNotifications(
+      [input.user_id],
+      "تم قبول طلب النقل",
+      `اكتمل نقل الفرد رقم ${input.personnel_id} إلى المعسكر الهدف بنجاح وسُجّل في سجل التدقيق.`,
+    );
+    return result;
   } catch (err) {
     if (err instanceof HttpError && err.statusCode >= 400 && err.statusCode < 500) {
       await writeAudit({
@@ -94,6 +116,11 @@ export async function executeTransfer(input: TransferInput) {
         newValue: { camp_to_id: input.camp_to_id, unit_to_id: input.unit_to_id, reason: err.message },
         ipAddress: input.ip_address,
       });
+      await createNotifications(
+        [input.user_id],
+        "رُفض طلب النقل",
+        `تعذّر تنفيذ النقل: ${err.message}`,
+      );
     }
     throw err;
   }

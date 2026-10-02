@@ -35,6 +35,7 @@ export default function TransfersPage() {
   const [saving, setSaving] = useState(false);
   const [open, setOpen] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState("");
   const [personId, setPersonId] = useState("");
   const [destinationCampId, setDestinationCampId] = useState("");
   const [destinationUnitId, setDestinationUnitId] = useState("");
@@ -61,6 +62,8 @@ export default function TransfersPage() {
   useEffect(() => { void load(); }, [load]);
   const selectedPerson = people.find((person) => String(person.personnel_id) === personId);
   const destinationUnits = useMemo(() => units.filter((unit) => unit.camp_id === Number(destinationCampId)), [units, destinationCampId]);
+  const visibleTransfers = useMemo(() => (statusFilter ? transfers.filter((item) => item.status === statusFilter) : transfers), [transfers, statusFilter]);
+  const transferStatusLabels: Record<string, string> = { pending: "قيد المعالجة", approved: "مقبول", rejected: "مرفوض", completed: "مكتمل" };
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -94,10 +97,10 @@ export default function TransfersPage() {
       <PageHeader title="الانتقالات بين المعسكرات" subtitle="نقل فرد إلى وحدة في معسكر آخر. يتحقق الخادم من السعة وينفّذ تحديث الفرد وسجل النقل والتدقيق ذريًا." action={<Button onClick={() => { setFormError(null); setOpen(true); }}><Plus size={17} />نقل جديد</Button>} />
       {notice && <div className="mb-5 flex items-center justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800" role="status"><span>{notice}</span><button onClick={() => setNotice(null)} aria-label="إغلاق">×</button></div>}
       <Panel className="overflow-hidden">
-        <div className="flex items-center gap-3 border-b border-line px-5 py-4"><span className="rounded-xl bg-brand-50 p-2.5 text-brand-600"><ArrowLeftRight size={19} /></span><div><h2 className="font-black">سجل الانتقالات</h2><p className="mt-1 text-xs text-muted">{new Intl.NumberFormat("ar").format(transfers.length)} عملية محفوظة دون حذف السجلات السابقة.</p></div></div>
-        <DataState loading={loading} error={error} empty={!loading && !error && transfers.length === 0} onRetry={() => void load()}>
+        <div className="flex items-center gap-3 border-b border-line px-5 py-4"><span className="rounded-xl bg-brand-50 p-2.5 text-brand-600"><ArrowLeftRight size={19} /></span><div><h2 className="font-black">سجل الانتقالات</h2><p className="mt-1 text-xs text-muted">{new Intl.NumberFormat("ar").format(visibleTransfers.length)} عملية محفوظة دون حذف السجلات السابقة.</p></div><select aria-label="تصفية حسب الحالة" className={`${inputClass()} mr-auto max-w-44`} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="">كل الحالات</option>{Object.entries(transferStatusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></div>
+        <DataState loading={loading} error={error} empty={!loading && !error && visibleTransfers.length === 0} onRetry={() => void load()}>
           <DataTable><thead><tr><th>الفرد</th><th>من المعسكر</th><th>إلى المعسكر</th><th>السبب</th><th>التاريخ</th><th>الحالة</th></tr></thead><tbody>
-            {transfers.map((item) => <tr key={item.transfer_id}><td className="font-bold text-ink">{item.personnel.full_name}</td><td>{item.camp_from.name}</td><td>{item.camp_to.name}</td><td>{item.reason || "—"}</td><td>{dateFmt.format(new Date(item.requested_at))}</td><td><StatusBadge value={item.status} /></td></tr>)}
+            {visibleTransfers.map((item) => <tr key={item.transfer_id}><td className="font-bold text-ink">{item.personnel.full_name}</td><td>{item.camp_from.name}</td><td>{item.camp_to.name}</td><td>{item.reason || "—"}</td><td>{dateFmt.format(new Date(item.requested_at))}</td><td><StatusBadge value={item.status} /></td></tr>)}
           </tbody></DataTable>
         </DataState>
       </Panel>

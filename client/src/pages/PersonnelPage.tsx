@@ -26,6 +26,8 @@ export default function PersonnelPage() {
   const [search, setSearch] = useState("");
   const [campFilter, setCampFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [unitFilter, setUnitFilter] = useState("");
+  const [rankFilter, setRankFilter] = useState("");
   const [page, setPage] = useState(1);
   const [form, setForm] = useState<{ mode: FormMode; person?: Personnel } | null>(null);
   const [statusPerson, setStatusPerson] = useState<Personnel | null>(null);
@@ -58,6 +60,8 @@ export default function PersonnelPage() {
     if (search) params.set("search", search);
     if (campFilter) params.set("camp_id", campFilter);
     if (statusFilter) params.set("status", statusFilter);
+    if (unitFilter) params.set("unit_id", unitFilter);
+    if (rankFilter) params.set("rank_id", rankFilter);
     try {
       const result = await api.get<{ items: Personnel[]; total: number }>(`/personnel?${params.toString()}`);
       setItems(result.items);
@@ -67,7 +71,7 @@ export default function PersonnelPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, search, campFilter, statusFilter]);
+  }, [page, search, campFilter, statusFilter, unitFilter, rankFilter]);
 
   useEffect(() => { void loadReferences(); }, [loadReferences]);
   useEffect(() => { void load(); }, [load]);
@@ -185,6 +189,8 @@ export default function PersonnelPage() {
           <label className="relative"><span className="sr-only">البحث بالاسم</span><Search size={16} className="absolute right-3 top-3 text-muted" /><input className={`${inputClass()} pr-9`} value={queryInput} onChange={(event) => setQueryInput(event.target.value)} placeholder="بحث بالاسم الكامل…" /></label>
           <label className="sr-only" htmlFor="camp-filter">تصفية حسب المعسكر</label><select id="camp-filter" className={inputClass()} value={campFilter} onChange={(event) => { setCampFilter(event.target.value); setPage(1); }}><option value="">كل المعسكرات</option>{camps.map((camp) => <option key={camp.camp_id} value={camp.camp_id}>{camp.name}</option>)}</select>
           <label className="sr-only" htmlFor="status-filter">تصفية حسب الحالة</label><select id="status-filter" className={inputClass()} value={statusFilter} onChange={(event) => { setStatusFilter(event.target.value); setPage(1); }}><option value="">كل الحالات</option>{Object.entries(statusLabels).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select>
+          <label className="sr-only" htmlFor="unit-filter">تصفية حسب الوحدة</label><select id="unit-filter" className={inputClass()} value={unitFilter} onChange={(event) => { setUnitFilter(event.target.value); setPage(1); }}><option value="">كل الوحدات</option>{units.map((unit) => <option key={unit.unit_id} value={unit.unit_id}>{unit.name}</option>)}</select>
+          <label className="sr-only" htmlFor="rank-filter">تصفية حسب الرتبة</label><select id="rank-filter" className={inputClass()} value={rankFilter} onChange={(event) => { setRankFilter(event.target.value); setPage(1); }}><option value="">كل الرتب</option>{ranks.map((rank) => <option key={rank.rank_id} value={rank.rank_id}>{rank.name}</option>)}</select>
           <Button type="submit" variant="secondary"><Search size={16} />بحث</Button>
         </form>
       </Panel>
