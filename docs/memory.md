@@ -121,6 +121,7 @@ docs/
 | 2026-09-26 | استكمال Phase 1: ترحيل PostgreSQL، واجهة React RTL، 16 اختبار تكامل ناجحًا، تحقق متصفح، وتحديث README وTodo-Phase-1 |
 | 2026-10-01 | تنفيذ تكامل التعيينات/المعسكرات والانتقالات الذرية، إدارة الصلاحيات ديناميكيًا، حماية RBAC وRate Limiting؛ اجتياز 21 اختبارًا والبناء والتحقق النوعي؛ مراجعة الفريق ما زالت مطلوبة |
 | 2026-10-01 | اعتماد استثناء عام محدود لـ`GET /api/v1/health` لفحوص التوافر، وتحديث RBAC والاختبارات والتوثيق المتعلق به |
+| 2026-10-02 | إصلاح اشتقاق رابط قاعدة الاختبار من `DATABASE_URL`، استعادة قوالب `.env.example`، إضافة دعم Rollup على Windows، وتوثيق الحالة في §9 |
 
 ---
 
@@ -159,4 +160,11 @@ Phase 1 مكتملة، ونُفّذ الجانب البرمجي الأساسي �
 - أُنشئت `server/src/integration/transfers.ts` و`server/src/integration/assignments.ts`، ومسارا `/api/v1/transfers` و`/api/v1/roles`، وصفحتا RTL للانتقالات والأدوار والصلاحيات.
 - تغطي الاختبارات النقل الناجح وامتلاء السعة وعدم تطابق الوحدة وسباق طلبين على سعة مقعد واحد، رفض RBAC والتغيير الفوري للصلاحية، حماية آخر مدير نظام، ومحدد تسجيل الدخول.
 - راجع `docs/Todo-Phase-2.md`؛ مراجعة الكود المشتركة البشرية/الفريقية ما زالت مطلوبة.
-- نُقل إعداد seed من الخاصية القديمة `server/package.json#prisma` إلى `server/prisma.config.ts` (Prisma 6.19.3)، وأصبح `npm run db:seed -w server` يستدعي `prisma db seed`؛ اختُبر الأمر على قاعدة الاختبار المنفصلة دون تحذير الإعداد القديم.
+- نُقل إعداد seed من الخاصية القديمة `server/package.json#prisma` إلى `server/prisma.config.ts` (Prisma 6.19.3)، وأصبح `npm run db:seed -w server` يستدعي `prisma db seed`.
+
+### إصلاحات ما بعد Phase 2 (2026-10-02)
+
+- استُعيدت قوالب `client/.env.example` و`server/.env.example` بعد حذفهما عن طريق الخطأ؛ تبقى القوالبَان متتبَّعتين في git.
+- كانت بيانات اتصال قاعدة الاختبار في `server/tests/global-setup.ts` و`server/tests/setup.ts` مثبّتة على `postgres:admin` ولم تعد تطابق الجهاز المحلي؛ أصبحت تُشتق الآن من `DATABASE_URL` في `server/.env` عبر `server/tests/test-db-url.ts` (استبدال اسم القاعدة بـ `personnel_camps_test`).
+- أُضيف `@rollup/rollup-win32-x64-msvc` إلى `client` لتوافق البناء على Windows.
+- التحقق بتاريخ 2026-10-02: `npm test` = **21/21**، و`npm run typecheck` و`npm run build` و`git diff --check` نجحت، والعمل كله مُنفَّذ commit `e007a90`.
