@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import PDFDocument from "pdfkit";
 import ExcelJS from "exceljs";
-import { convertArabic } from "arabic-reshaper";
+import ArabicReshaper from "arabic-reshaper";
 
 export interface SummaryData {
   total_personnel: number;
@@ -86,7 +86,7 @@ function arabicLine(text: string): string {
     .split(/\s+/)
     .filter(Boolean)
     .reverse()
-    .map((word) => (/[؀-ۿ]/.test(word) ? [...convertArabic(word)].reverse().join("") : word))
+    .map((word) => (/[؀-ۿ]/.test(word) ? [...ArabicReshaper.convertArabic(word)].reverse().join("") : word))
     .join(" ");
 }
 
