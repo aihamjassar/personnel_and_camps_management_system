@@ -8,5 +8,11 @@ export default defineConfig({
     globalSetup: ["tests/global-setup.ts"],
     fileParallelism: false, // serial: tests share one Postgres test database
     testTimeout: 30000,
+    coverage: {
+      provider: "v8",
+      include: ["src/**/*.ts"],
+      reporter: ["text", "lcov", "html"],
+      thresholds: { lines: 70 },
+    },
   },
 });

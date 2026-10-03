@@ -4,7 +4,7 @@
 
 An academic full-stack system for managing fictional personnel records and camp facilities. The application uses React, TypeScript, Express, Prisma, and PostgreSQL, with an Arabic right-to-left interface. **Use fictional academic data only—never enter real personnel, military, or sensitive information.**
 
-> **Project status:** Phase 1 is complete. The Phase 2 implementation (cross-module integration, transfers, and dynamic RBAC) is built and verified; the team code review is still pending. See [Phase 2 checklist](docs/Todo-Phase-2.md).
+> **Project status:** Phases 1–3 are implemented. Phase 4 testing is underway: 24/24 API integration tests pass and backend line coverage is 90.65%. See the [Phase 4 checklist](docs/Todo-Phase-4.md) and [test report](docs/Testing-Report.md). A team code review for Phase 2 is still pending.
 
 ## Features
 
@@ -14,7 +14,7 @@ An academic full-stack system for managing fictional personnel records and camp 
 - Camps, organizational units, ranks, positions, and assignments.
 - Camp-to-camp transfers with destination-unit and capacity checks; personnel, transfer, and audit records are committed atomically.
 - User, role, and permission administration, with permission changes applied dynamically.
-- Audit history and basic reports.
+- Filterable audit history, PDF/Excel report exports, in-app notifications, and compound personnel search.
 
 ## Technology
 
@@ -77,10 +77,11 @@ After seeding, use `admin` / `Admin@1234` for local academic demonstrations. Thi
 ```bash
 npm run typecheck
 npm test
+npm run coverage
 npm run build
 ```
 
-The integration-test setup targets the dedicated `personnel_camps_test` database and force-resets its schema. **Never point it at a development or production database containing data you need.** If your local PostgreSQL credentials differ from the test setup, update the test connection in `server/tests/global-setup.ts` before running tests. All test fixtures are synthetic.
+The integration-test setup targets the dedicated `personnel_camps_test` database and force-resets its schema. **Never point it at a development or production database containing data you need.** Tests and coverage generate Prisma Client before running. All test fixtures are synthetic; coverage reports backend source only.
 
 ## API and access notes
 
@@ -92,7 +93,8 @@ Versioned API routes are under `/api/v1`. Protected application routes use JWT a
 - [`docs/memory.md`](docs/memory.md) — architecture decisions, scope, and current resume state.
 - [`docs/Architecture.md`](docs/Architecture.md) — system architecture and security model.
 - [`docs/Data-Flow.md`](docs/Data-Flow.md) and [`docs/Flow-of-Action.md`](docs/Flow-of-Action.md) — integration and transfer flows.
-- [`docs/Todo-Phase-1.md`](docs/Todo-Phase-1.md) and [`docs/Todo-Phase-2.md`](docs/Todo-Phase-2.md) — delivery checklists.
+- [`docs/Todo-Phase-1.md`](docs/Todo-Phase-1.md) through [`docs/Todo-Phase-4.md`](docs/Todo-Phase-4.md) — delivery checklists.
+- [`docs/Testing-Report.md`](docs/Testing-Report.md) — measured test, coverage, build, and dependency-audit results.
 - [`docs/browser-verification.md`](docs/browser-verification.md) — manual browser smoke-test notes.
 
 ## Deployment caution
