@@ -4,7 +4,7 @@
 
 مشروع أكاديمي متكامل لإدارة سجلات أفراد افتراضيين ومرافق المعسكرات. يستخدم النظام React وTypeScript وExpress وPrisma وPostgreSQL، مع واجهة عربية تدعم اتجاه الكتابة من اليمين إلى اليسار (RTL). **استخدم بيانات افتراضية أكاديمية فقط؛ لا تُدخل بيانات أفراد أو بيانات عسكرية أو معلومات حساسة حقيقية.**
 
-> **حالة المشروع:** اكتملت مراحل Phase 1–3، وبدأت Phase 4 للاختبار. تنجح اختبارات تكامل API وعددها 24/24، وتبلغ تغطية أسطر الخادم 90.65%. راجع [قائمة Phase 4](docs/Todo-Phase-4.md) و[تقرير الاختبارات](docs/Testing-Report.md). لا تزال مراجعة الفريق المشتركة لـPhase 2 مطلوبة.
+> **حالة المشروع:** اكتمل تنفيذ متطلبات API الموثقة FR-01–FR-16، وأُضيف دليل المستخدم ومرجع API والمرجع الفني ومصفوفة التتبع. آخر قياس: 50/50 اختبارًا ناجحًا وتغطية أسطر/تعليمات 92.58%. لا تُعدّ النسخة منشورة: مراجعة الفريق، اختبار E2E، معالجة تحذيرات الإنتاج، والمضيف/النطاق الفعلي ما زالت مطلوبة. راجع [قائمة Phase 4](docs/Todo-Phase-4.md) و[تقرير الاختبارات](docs/Testing-Report.md).
 
 ## الميزات
 
@@ -43,9 +43,10 @@
    ```bash
    createdb personnel_camps
    cp server/.env.example server/.env
+   cp client/.env.example client/.env
    ```
 
-   عدّل `server/.env` واضبط `DATABASE_URL` ليتوافق مع اتصال PostgreSQL لديك، واستبدل `JWT_SECRET` بقيمة سرية قوية. لا ترفع `server/.env` إلى Git ولا تشارك الأسرار.
+   عدّل `server/.env` واضبط `DATABASE_URL` ليتوافق مع اتصال PostgreSQL لديك، واستبدل `JWT_SECRET` بقيمة سرية قوية. يستخدم العميل المسار النسبي `/api/v1` افتراضيًا؛ يمرره Vite إلى خادم التطوير. لا ترفع ملفات `.env` إلى Git ولا تشارك الأسرار.
 
 3. طبّق الترحيلات وأضف بيانات عرض افتراضية:
 
@@ -85,13 +86,18 @@ npm run build
 
 ## ملاحظات API والصلاحيات
 
-توجد مسارات API ذات الإصدارات تحت `/api/v1`. تتطلب مسارات التطبيق المحمية مصادقة JWT وصلاحية RBAC يتحقق منها الخادم. هناك مساران عامان عن قصد: `POST /api/v1/auth/login` و`GET /api/v1/health` لفحص التوافر فقط. لا تُرجع نقطة الصحة سوى `{ "ok": true }` ولا تكشف معلومات عن قاعدة البيانات أو تفاصيل تشغيلية.
+توجد مسارات API ذات الإصدارات تحت `/api/v1`. تتطلب مسارات التطبيق المحمية مصادقة JWT وصلاحية RBAC يتحقق منها الخادم. هناك مساران عامان عن قصد: `POST /api/v1/auth/login` و`GET /api/v1/health` لفحص التوافر فقط. تعيد نقطة الصحة المغلف الأدنى `{ "status": "success", "data": { "ok": true }, "error": null }` ولا تكشف معلومات عن قاعدة البيانات أو تفاصيل تشغيلية.
 
 ## دليل المستودع
 
 - [`AGENTS.md`](AGENTS.md) — قواعد التطوير والأوامر.
 - [`docs/memory.md`](docs/memory.md) — القرارات المعمارية والنطاق وحالة الاستئناف.
 - [`docs/Architecture.md`](docs/Architecture.md) — معمارية النظام ونموذج الأمان.
+- [`docs/User-Guide.ar.md`](docs/User-Guide.ar.md) — دليل الاستخدام حسب الدور.
+- [`docs/API-Reference.md`](docs/API-Reference.md) — المسارات والصلاحيات والمدخلات.
+- [`docs/Technical-Reference.md`](docs/Technical-Reference.md) — المرجع الفني والتشغيلي.
+- [`docs/Requirements-Traceability.md`](docs/Requirements-Traceability.md) — أدلة تتبع FR-01 إلى FR-16 وحدود التحقق.
+- [`docs/Feasibility-Review-Addendum.md`](docs/Feasibility-Review-Addendum.md) — مراجعة هندسية مقيّدة بتوفر مستندات المستودع.
 - [`docs/Data-Flow.md`](docs/Data-Flow.md) و[`docs/Flow-of-Action.md`](docs/Flow-of-Action.md) — تدفقات التكامل والانتقالات.
 - [`docs/Todo-Phase-1.md`](docs/Todo-Phase-1.md) إلى [`docs/Todo-Phase-4.md`](docs/Todo-Phase-4.md) — قوائم التسليم المرحلية.
 - [`docs/Testing-Report.md`](docs/Testing-Report.md) — نتائج الاختبارات والتغطية والبناء ومراجعة الاعتمادات.

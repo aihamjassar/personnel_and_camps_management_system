@@ -12,6 +12,7 @@ import {
   Medal,
   Bell,
   ArrowLeftRight,
+  Settings as SettingsIcon,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 
@@ -27,6 +28,7 @@ const links = [
   { to: "/app/users", label: "المستخدمون", permission: "users.manage", icon: ShieldCheck },
   { to: "/app/roles", label: "الأدوار والصلاحيات", permission: "users.manage", icon: ShieldCheck },
   { to: "/app/audit", label: "سجل التدقيق", permission: "system.admin", icon: ClipboardList },
+  { to: "/app/settings", label: "إعدادات النظام", permission: "system.admin", icon: SettingsIcon },
   { to: "/app/notifications", label: "الإشعارات", permission: "", icon: Bell },
 ];
 

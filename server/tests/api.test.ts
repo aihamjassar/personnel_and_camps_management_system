@@ -1,6 +1,7 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import request from "supertest";
 import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
 import { createApp } from "../src/app.js";
 import { prisma } from "../src/lib/prisma.js";
 
@@ -238,6 +239,41 @@ describe("Phase 1 reference data and assignments", () => {
     expect((await request(app).delete(`/api/v1/camps/${campId}`).set("Authorization", `Bearer ${adminToken}`)).status).toBe(200);
   });
 
+  it("keeps unit parents in the same camp and prevents hierarchy cycles", async () => {
+    const campA = await prisma.camp.create({ data: { name: "Hierarchy Camp A", capacity: 10 } });
+    const campB = await prisma.camp.create({ data: { name: "Hierarchy Camp B", capacity: 10 } });
+    const parent = await prisma.organizationalUnit.create({ data: { name: "Hierarchy Parent", camp_id: campA.camp_id } });
+    const child = await request(app)
+      .post("/api/v1/units")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ name: "Hierarchy Child", camp_id: campA.camp_id, parent_unit_id: parent.unit_id });
+    expect(child.status).toBe(201);
+
+    const crossCamp = await request(app)
+      .post("/api/v1/units")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ name: "Invalid Cross-Camp Child", camp_id: campB.camp_id, parent_unit_id: parent.unit_id });
+    expect(crossCamp.status).toBe(400);
+
+    const selfParent = await request(app)
+      .put(`/api/v1/units/${parent.unit_id}`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ parent_unit_id: parent.unit_id });
+    expect(selfParent.status).toBe(400);
+
+    const cycle = await request(app)
+      .put(`/api/v1/units/${parent.unit_id}`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ parent_unit_id: child.body.data.unit_id });
+    expect(cycle.status).toBe(400);
+
+    const incompatibleCampChange = await request(app)
+      .put(`/api/v1/units/${child.body.data.unit_id}`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ camp_id: campB.camp_id });
+    expect(incompatibleCampChange.status).toBe(400);
+  });
+
   it("creates assignments and transactionally closes the prior current assignment", async () => {
     const camp1 = await prisma.camp.create({ data: { name: "Assignment Test Camp A", capacity: 10 } });
     const camp2 = await prisma.camp.create({ data: { name: "Assignment Test Camp B", capacity: 10 } });
@@ -273,6 +309,25 @@ describe("Phase 1 reference data and assignments", () => {
     expect(persistedPerson.unit_id).toBe(unit2.unit_id);
     expect(persistedPerson.camp_id).toBe(camp2.camp_id);
     expect(await prisma.auditLog.count({ where: { action_type: "AssignmentCreated", target_id: second.body.data.assignment_id } })).toBe(1);
+  });
+
+  it("allows assignment-only users to load minimal eligible personnel choices", async () => {
+    const permission = await prisma.permission.findUniqueOrThrow({ where: { permission_key: "assignments.manage" } });
+    const role = await prisma.role.create({ data: { role_name: "assignment-only-test" } });
+    await prisma.rolePermission.create({ data: { role_id: role.role_id, permission_id: permission.permission_id } });
+    const user = await prisma.user.create({
+      data: { username: "assignment_only_t", password_hash: await bcrypt.hash("Assignment@123", 10), full_name: "Assignment Only" },
+    });
+    await prisma.userRole.create({ data: { user_id: user.user_id, role_id: role.role_id } });
+    const token = await login("assignment_only_t", "Assignment@123");
+    const candidate = await prisma.personnel.create({ data: { full_name: "Eligible Assignment Person" } });
+
+    const response = await request(app)
+      .get("/api/v1/assignments/eligible-personnel")
+      .set("Authorization", `Bearer ${token}`);
+    expect(response.status).toBe(200);
+    const listedCandidate = response.body.data.items.find((item: { personnel_id: number }) => item.personnel_id === candidate.personnel_id);
+    expect(listedCandidate).toEqual({ personnel_id: candidate.personnel_id, full_name: "Eligible Assignment Person" });
   });
 });
 
@@ -451,6 +506,39 @@ describe("users", () => {
 });
 
 describe("audit", () => {
+  it("applies both inclusive date bounds and rejects invalid ranges", async () => {
+    const admin = await prisma.user.findUniqueOrThrow({ where: { username: "admin_t" } });
+    const timestamps = [
+      new Date("2026-01-01T23:59:59.999Z"),
+      new Date("2026-01-02T12:00:00.000Z"),
+      new Date("2026-01-03T00:00:00.000Z"),
+    ];
+    await prisma.auditLog.createMany({
+      data: timestamps.map((created_at, index) => ({
+        user_id: admin.user_id,
+        action_type: `AuditRange${index}`,
+        target_table: "AuditRangeFixture",
+        created_at,
+      })),
+    });
+
+    const ranged = await request(app)
+      .get("/api/v1/audit?target_table=AuditRangeFixture&from=2026-01-02T00:00:00.000Z&to=2026-01-02T23:59:59.999Z")
+      .set("Authorization", `Bearer ${adminToken}`);
+    expect(ranged.status).toBe(200);
+    expect(ranged.body.data.items.map((item: { action_type: string }) => item.action_type)).toEqual(["AuditRange1"]);
+
+    const invalid = await request(app)
+      .get("/api/v1/audit?from=not-a-date")
+      .set("Authorization", `Bearer ${adminToken}`);
+    expect(invalid.status).toBe(400);
+
+    const reversed = await request(app)
+      .get("/api/v1/audit?from=2026-02-01&to=2026-01-01")
+      .set("Authorization", `Bearer ${adminToken}`);
+    expect(reversed.status).toBe(400);
+  });
+
   it("records login and personnel events, admin-only access", async () => {
     const denied = await request(app)
       .get("/api/v1/audit")
@@ -537,8 +625,37 @@ describe("Phase 3 advanced features", () => {
     expect(after.body.data.items.length).toBe(0);
   });
 
+  it("filters the report summary by record date, camp and current status", async () => {
+    const camp = await prisma.camp.create({ data: { name: "Filtered Report Camp", capacity: 20 } });
+    await prisma.personnel.createMany({
+      data: [
+        { full_name: "Included Filtered Person", camp_id: camp.camp_id, current_status: "on_leave", created_at: new Date("2025-02-12T12:00:00.000Z") },
+        { full_name: "Outside Date Person", camp_id: camp.camp_id, current_status: "on_leave", created_at: new Date("2025-03-12T12:00:00.000Z") },
+        { full_name: "Different Status Person", camp_id: camp.camp_id, current_status: "active", created_at: new Date("2025-02-15T12:00:00.000Z") },
+      ],
+    });
+
+    const response = await request(app)
+      .get(`/api/v1/reports/summary?from=2025-02-01T00:00:00.000Z&to=2025-02-28T23:59:59.999Z&camp_id=${camp.camp_id}&status=on_leave`)
+      .set("Authorization", `Bearer ${adminToken}`);
+    expect(response.status).toBe(200);
+    expect(response.body.data.total_personnel).toBe(1);
+    expect(response.body.data.active_personnel).toBe(0);
+    expect(response.body.data.status_breakdown).toEqual([{ status: "on_leave", count: 1 }]);
+    expect(response.body.data.by_camp).toEqual([
+      expect.objectContaining({ camp_id: camp.camp_id, count: 1 }),
+    ]);
+    expect(response.body.data.available_camps).toContainEqual({ camp_id: camp.camp_id, name: "Filtered Report Camp" });
+    expect(response.body.data.filters.status).toBe("on_leave");
+
+    const invalid = await request(app)
+      .get("/api/v1/reports/summary?status=unknown")
+      .set("Authorization", `Bearer ${adminToken}`);
+    expect(invalid.status).toBe(400);
+  });
+
   it("exports the summary report as Excel and PDF", async () => {
-    const xlsx = await request(app).get("/api/v1/reports/export?format=xlsx").set("Authorization", `Bearer ${adminToken}`).buffer(true).parse((res, cb) => { const chunks: Buffer[] = []; res.on("data", (c: Buffer) => chunks.push(c)); res.on("end", () => cb(null, Buffer.concat(chunks))); });
+    const xlsx = await request(app).get("/api/v1/reports/export?format=xlsx&status=active").set("Authorization", `Bearer ${adminToken}`).buffer(true).parse((res, cb) => { const chunks: Buffer[] = []; res.on("data", (c: Buffer) => chunks.push(c)); res.on("end", () => cb(null, Buffer.concat(chunks))); });
     expect(xlsx.status).toBe(200);
     expect(xlsx.headers["content-type"]).toContain("spreadsheetml");
     expect((xlsx.body as Buffer).subarray(0, 2).toString()).toBe("PK");
@@ -553,8 +670,82 @@ describe("Phase 3 advanced features", () => {
 
     const exported = await request(app).get("/api/v1/audit?action_type=ReportExported").set("Authorization", `Bearer ${adminToken}`);
     expect(exported.body.data.items.length).toBeGreaterThan(0);
+    expect(exported.body.data.items.some((item: { new_value: { format?: string; filters?: { status?: string } } }) =>
+      item.new_value?.format === "xlsx" && item.new_value?.filters?.status === "active",
+    )).toBe(true);
 
     const viewerDenied = await request(app).get("/api/v1/reports/export?format=xlsx").set("Authorization", `Bearer ${officerToken}`);
     expect(viewerDenied.status).toBe(403);
+  });
+});
+
+describe("system settings (FR-16)", () => {
+  it("restricts settings, audits changes, enforces password rules, and applies session duration to new tokens", async () => {
+    const denied = await request(app).get("/api/v1/settings").set("Authorization", `Bearer ${viewerToken}`);
+    expect(denied.status).toBe(403);
+
+    const policyDenied = await request(app).get("/api/v1/settings/password-policy").set("Authorization", `Bearer ${viewerToken}`);
+    expect(policyDenied.status).toBe(403);
+
+    const initial = await request(app).get("/api/v1/settings").set("Authorization", `Bearer ${adminToken}`);
+    expect(initial.status).toBe(200);
+    expect(initial.body.data.settings).toMatchObject({ passwordMinLength: 8, sessionDurationHours: 8 });
+
+    const invalid = await request(app).put("/api/v1/settings").set("Authorization", `Bearer ${adminToken}`).send({
+      passwordMinLength: 7,
+      requireUppercase: true,
+      requireNumber: true,
+      requireSymbol: true,
+      sessionDurationHours: 8,
+    });
+    expect(invalid.status).toBe(400);
+
+    const saved = await request(app).put("/api/v1/settings").set("Authorization", `Bearer ${adminToken}`).send({
+      passwordMinLength: 12,
+      requireUppercase: true,
+      requireNumber: true,
+      requireSymbol: true,
+      sessionDurationHours: 4,
+    });
+    expect(saved.status).toBe(200);
+    expect(saved.body.data.settings.sessionDurationHours).toBe(4);
+
+    const audit = await prisma.auditLog.findFirst({
+      where: { action_type: "SystemSettingChanged", target_table: "SystemSettings" },
+      orderBy: { created_at: "desc" },
+    });
+    expect(audit?.user_id).toBe((await prisma.user.findUniqueOrThrow({ where: { username: "admin_t" } })).user_id);
+    expect(audit?.old_value).toMatchObject({ sessionDurationHours: 8 });
+    expect(audit?.new_value).toMatchObject({ sessionDurationHours: 4, passwordMinLength: 12 });
+
+    const limitedPolicy = await request(app).get("/api/v1/settings/password-policy").set("Authorization", `Bearer ${adminToken}`);
+    expect(limitedPolicy.body.data).toMatchObject({ passwordMinLength: 12, requireSymbol: true });
+    expect(limitedPolicy.body.data).not.toHaveProperty("sessionDurationHours");
+
+    const weak = await request(app).post("/api/v1/users").set("Authorization", `Bearer ${adminToken}`).send({
+      username: "policy_user",
+      full_name: "Policy User",
+      password: "Weakpass9",
+      role_ids: [],
+    });
+    expect(weak.status).toBe(400);
+    expect(weak.body.error.message).toContain("system policy");
+
+    const created = await request(app).post("/api/v1/users").set("Authorization", `Bearer ${adminToken}`).send({
+      username: "policy_user",
+      full_name: "Policy User",
+      password: "StrongPass9!",
+      role_ids: [],
+    });
+    expect(created.status).toBe(201);
+    expect(created.body.data).not.toHaveProperty("password_hash");
+
+    const loginResult = await request(app).post("/api/v1/auth/login").send({ username: "policy_user", password: "StrongPass9!" });
+    expect(loginResult.status).toBe(200);
+    const tokenPayload = jwt.decode(loginResult.body.data.token) as { iat: number; exp: number };
+    expect(tokenPayload.exp - tokenPayload.iat).toBe(4 * 60 * 60);
+
+    const weakReset = await request(app).put(`/api/v1/users/${created.body.data.user_id}`).set("Authorization", `Bearer ${adminToken}`).send({ password: "Weakpass9" });
+    expect(weakReset.status).toBe(400);
   });
 });

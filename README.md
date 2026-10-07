@@ -4,7 +4,7 @@
 
 An academic full-stack system for managing fictional personnel records and camp facilities. The application uses React, TypeScript, Express, Prisma, and PostgreSQL, with an Arabic right-to-left interface. **Use fictional academic data only—never enter real personnel, military, or sensitive information.**
 
-> **Project status:** Phases 1–3 are implemented. Phase 4 testing is underway: 24/24 API integration tests pass and backend line coverage is 90.65%. See the [Phase 4 checklist](docs/Todo-Phase-4.md) and [test report](docs/Testing-Report.md). A team code review for Phase 2 is still pending.
+> **Project status:** The documented FR-01–FR-16 API behavior is implemented, with user, API, technical, and traceability documentation added. Latest run: 50/50 tests pass and backend line/statement coverage is 92.58%. This is **not a deployed release**: team review, full browser E2E, production dependency remediation, and a real host/domain remain open. See the [Phase 4 checklist](docs/Todo-Phase-4.md) and [test report](docs/Testing-Report.md).
 
 ## Features
 
@@ -43,9 +43,10 @@ Run commands from the repository root unless noted otherwise.
    ```bash
    createdb personnel_camps
    cp server/.env.example server/.env
+   cp client/.env.example client/.env
    ```
 
-   Edit `server/.env`: set `DATABASE_URL` to your PostgreSQL connection string and replace `JWT_SECRET` with a strong private value. Do not commit `server/.env` or share secrets.
+   Edit `server/.env`: set `DATABASE_URL` to your PostgreSQL connection string and replace `JWT_SECRET` with a strong private value. The client defaults to the same-origin `/api/v1` path, which Vite proxies to the API. Do not commit `.env` files or share secrets.
 
 3. Apply migrations and add fictional demo data:
 
@@ -85,13 +86,18 @@ The integration-test setup targets the dedicated `personnel_camps_test` database
 
 ## API and access notes
 
-Versioned API routes are under `/api/v1`. Protected application routes use JWT authentication and server-side RBAC. Two endpoints are intentionally public: `POST /api/v1/auth/login` and the minimal `GET /api/v1/health` liveness check. The health response only reports `{ "ok": true }`; it does not expose database or operational details.
+Versioned API routes are under `/api/v1`. Protected application routes use JWT authentication and server-side RBAC. Two endpoints are intentionally public: `POST /api/v1/auth/login` and the minimal `GET /api/v1/health` liveness check. Health returns the small envelope `{ "status": "success", "data": { "ok": true }, "error": null }`; it does not expose database or operational details.
 
 ## Repository guide
 
 - [`AGENTS.md`](AGENTS.md) — development rules and commands.
 - [`docs/memory.md`](docs/memory.md) — architecture decisions, scope, and current resume state.
 - [`docs/Architecture.md`](docs/Architecture.md) — system architecture and security model.
+- [`docs/User-Guide.ar.md`](docs/User-Guide.ar.md) — role-based Arabic user guide.
+- [`docs/API-Reference.md`](docs/API-Reference.md) — endpoint, permission, and request reference.
+- [`docs/Technical-Reference.md`](docs/Technical-Reference.md) — technical and operational reference.
+- [`docs/Requirements-Traceability.md`](docs/Requirements-Traceability.md) — FR-01 to FR-16 evidence and validation limits.
+- [`docs/Feasibility-Review-Addendum.md`](docs/Feasibility-Review-Addendum.md) — engineering feasibility review bounded by available source documents.
 - [`docs/Data-Flow.md`](docs/Data-Flow.md) and [`docs/Flow-of-Action.md`](docs/Flow-of-Action.md) — integration and transfer flows.
 - [`docs/Todo-Phase-1.md`](docs/Todo-Phase-1.md) through [`docs/Todo-Phase-4.md`](docs/Todo-Phase-4.md) — delivery checklists.
 - [`docs/Testing-Report.md`](docs/Testing-Report.md) — measured test, coverage, build, and dependency-audit results.

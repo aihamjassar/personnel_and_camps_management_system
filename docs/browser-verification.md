@@ -43,3 +43,9 @@ A synthetic `demo_viewer` account with only the Report Viewer role was created s
 The report-only account authenticated successfully and received a dashboard-only sidebar (plus logout); personnel, camps, reference data, assignments, and user administration were absent from its visible navigation. The dashboard correctly reflected the updated inactive/on-leave sample status counts.
 
 Opening `/app/personnel` directly as the report-only user displayed the explicit no-permission state instead of the protected page, confirming the client route guard complements backend authorization.
+
+## Phase 4 smoke check — 2026-10-05
+
+On the isolated `personnel_camps_test` database, the local seed account authenticated through the browser and reached `/app/dashboard`; the dashboard displayed its filtered zero-data state and all expected report filters. `/app/settings` loaded with the system-administrator session and showed the persisted password/session defaults. No setting was changed during this smoke check. These checks cover only login, dashboard rendering, and settings read; they are not a complete E2E/acceptance run.
+
+The first login attempt exposed a setup defect: with no ignored `client/.env` file, `VITE_API_URL` was undefined and the client parsed Vite's HTML fallback as an API response. The client now defaults to same-origin `/api/v1`, which is proxied by Vite in development and by Caddy in the staging layout. The default was verified through a successful browser login without setting `client/.env`.

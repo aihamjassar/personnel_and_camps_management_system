@@ -1,4 +1,4 @@
-// 13 tables per docs/Architecture.md §5 (3NF) + join tables from §5.2.
+// 14 functional tables per docs/Architecture.md §5 (3NF) + two join tables from §5.2.
 // Column names mapped to snake_case to match the documented data dictionary.
 
 generator client {
@@ -228,4 +228,12 @@ model Notification {
 
   @@index([user_id])
   @@map("notifications")
+}
+
+model SystemSetting {
+  setting_key   String   @id
+  setting_value Json
+  updated_at    DateTime @updatedAt
+
+  @@map("system_settings")
 }

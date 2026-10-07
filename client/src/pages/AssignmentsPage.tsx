@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Plus, ClipboardList, CalendarDays } from "lucide-react";
 import { api, ApiError } from "../lib/api";
-import type { Assignment, Personnel, Position, Unit } from "../lib/types";
+import type { Assignment, AssignmentCandidate, Position, Unit } from "../lib/types";
 import { Button, DataState, DataTable, Field, inputClass, Modal, PageHeader, Panel, StatusBadge } from "../components/ui";
 
 const dateFmt = new Intl.DateTimeFormat("ar", { dateStyle: "medium" });
 
 export default function AssignmentsPage() {
   const [items, setItems] = useState<Assignment[]>([]);
-  const [people, setPeople] = useState<Personnel[]>([]);
+  const [people, setPeople] = useState<AssignmentCandidate[]>([]);
   const [units, setUnits] = useState<Unit[]>([]);
   const [positions, setPositions] = useState<Position[]>([]);
   const [loading, setLoading] = useState(true);
@@ -24,7 +24,7 @@ export default function AssignmentsPage() {
     try {
       const [assignmentData, personnelData, unitData, positionData] = await Promise.all([
         api.get<{ items: Assignment[]; total: number }>("/assignments"),
-        api.get<{ items: Personnel[] }>("/personnel?page=1&page_size=100"),
+        api.get<{ items: AssignmentCandidate[] }>("/assignments/eligible-personnel"),
         api.get<{ items: Unit[] }>("/units"),
         api.get<{ items: Position[] }>("/positions"),
       ]);

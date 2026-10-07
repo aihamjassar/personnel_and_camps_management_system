@@ -111,3 +111,11 @@ export const transferSchema = z.object({
 export const rolePermissionsSchema = z.object({
   permission_ids: z.array(z.int().positive()).max(100),
 });
+
+export const systemSettingsSchema = z.object({
+  passwordMinLength: z.number().int().min(8).max(64),
+  requireUppercase: z.boolean(),
+  requireNumber: z.boolean(),
+  requireSymbol: z.boolean(),
+  sessionDurationHours: z.number().int().min(1).max(24),
+});

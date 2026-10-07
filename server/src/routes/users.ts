@@ -7,6 +7,8 @@ import { authenticate, requirePermission } from "../middleware/auth.js";
 import { validateBody } from "../middleware/validate.js";
 import { HttpError } from "../middleware/error.js";
 import { createUserSchema, updateUserSchema } from "../validators/schemas.js";
+import { getSystemSettings } from "../lib/system-settings.js";
+import { passwordPolicyViolations } from "../lib/password-policy.js";
 
 export const usersRouter = Router();
 usersRouter.use(authenticate);
@@ -50,6 +52,9 @@ usersRouter.post(
   async (req, res, next) => {
     try {
       const { username, password, full_name, email, role_ids } = req.body;
+      const policy = await getSystemSettings();
+      const violations = passwordPolicyViolations(password, policy);
+      if (violations.length) throw new HttpError(400, `Password does not satisfy system policy: ${violations.join(", ")}`);
       const password_hash = await bcrypt.hash(password, 10);
       const created = await prisma.user.create({
         data: {
@@ -92,6 +97,11 @@ usersRouter.put(
         password?: string;
         role_ids?: number[];
       };
+      if (body.password) {
+        const policy = await getSystemSettings();
+        const violations = passwordPolicyViolations(body.password, policy);
+        if (violations.length) throw new HttpError(400, `Password does not satisfy system policy: ${violations.join(", ")}`);
+      }
       const password_hash = body.password ? await bcrypt.hash(body.password, 10) : undefined;
       const updated = await prisma.$transaction(async (tx) => {
         // Share a global lock with role-permission changes so two administrators cannot

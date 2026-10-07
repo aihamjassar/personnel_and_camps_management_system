@@ -6,6 +6,9 @@ import ArabicReshaper from "arabic-reshaper";
 export interface SummaryData {
   total_personnel: number;
   active_personnel: number;
+  status_breakdown: Array<{ status: string; count: number }>;
+  filters: { from: string | null; to: string | null; camp_id: number | null; status: string | null };
+  available_camps: Array<{ camp_id: number; name: string }>;
   by_camp: Array<{ camp_id: number | null; name: string; count: number; capacity: number }>;
   by_rank: Array<{ rank_id: number | null; name: string; count: number }>;
   recent_transfers: Array<{
@@ -34,7 +37,19 @@ export async function buildXlsx(summary: SummaryData): Promise<Buffer> {
   ];
   summarySheet.addRow({ metric: "إجمالي الأفراد", value: summary.total_personnel });
   summarySheet.addRow({ metric: "الأفراد النشطون", value: summary.active_personnel });
+  summarySheet.addRow({ metric: "من تاريخ إنشاء السجل", value: summary.filters.from ?? "—" });
+  summarySheet.addRow({ metric: "إلى تاريخ إنشاء السجل", value: summary.filters.to ?? "—" });
+  summarySheet.addRow({ metric: "معرّف المعسكر", value: summary.filters.camp_id ?? "كل المعسكرات" });
+  summarySheet.addRow({ metric: "الحالة الحالية", value: summary.filters.status ?? "كل الحالات" });
   summarySheet.getRow(1).font = { bold: true };
+
+  const statusSheet = workbook.addWorksheet("حسب الحالة", { views: [{ rightToLeft: true }] });
+  statusSheet.columns = [
+    { header: "الحالة", key: "status", width: 24 },
+    { header: "العدد", key: "count", width: 12 },
+  ];
+  for (const status of summary.status_breakdown) statusSheet.addRow(status);
+  statusSheet.getRow(1).font = { bold: true };
 
   const campsSheet = workbook.addWorksheet("حسب المعسكر", { views: [{ rightToLeft: true }] });
   campsSheet.columns = [
@@ -114,6 +129,17 @@ export async function buildPdf(summary: SummaryData): Promise<Buffer> {
   doc.fontSize(12);
   doc.text(arabicLine(`إجمالي الأفراد: ${summary.total_personnel}`), { align: "right" });
   doc.text(arabicLine(`الأفراد النشطون: ${summary.active_personnel}`), { align: "right" });
+  doc.text(arabicLine(`من تاريخ إنشاء السجل: ${summary.filters.from ?? "—"}`), { align: "right" });
+  doc.text(arabicLine(`إلى تاريخ إنشاء السجل: ${summary.filters.to ?? "—"}`), { align: "right" });
+  doc.text(arabicLine(`معرّف المعسكر: ${summary.filters.camp_id ?? "كل المعسكرات"}`), { align: "right" });
+  doc.text(arabicLine(`الحالة الحالية: ${summary.filters.status ?? "كل الحالات"}`), { align: "right" });
+  doc.moveDown();
+
+  doc.fontSize(14).text(arabicLine("توزيع الأفراد حسب الحالة"), { align: "right" });
+  doc.fontSize(11);
+  for (const entry of summary.status_breakdown) {
+    doc.text(arabicLine(`- ${entry.status}: ${entry.count}`), { align: "right" });
+  }
   doc.moveDown();
 
   doc.fontSize(14).text(arabicLine(CAMPS_TITLE), { align: "right" });

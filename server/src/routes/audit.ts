@@ -3,6 +3,7 @@ import { prisma } from "../lib/prisma.js";
 import { ok } from "../lib/response.js";
 import { writeAudit } from "../lib/audit.js";
 import { authenticate, requirePermission } from "../middleware/auth.js";
+import { HttpError } from "../middleware/error.js";
 
 export const auditRouter = Router();
 auditRouter.use(authenticate);
@@ -21,12 +22,20 @@ auditRouter.get(
       const targetTable = typeof req.query.target_table === "string" ? req.query.target_table : undefined;
       const from = typeof req.query.from === "string" ? new Date(req.query.from) : undefined;
       const to = typeof req.query.to === "string" ? new Date(req.query.to) : undefined;
+      if ((from && Number.isNaN(from.getTime())) || (to && Number.isNaN(to.getTime()))) {
+        throw new HttpError(400, "Invalid audit date filter");
+      }
+      if (from && to && from > to) {
+        throw new HttpError(400, "Audit date range start must be before or equal to its end");
+      }
+      const createdAt: { gte?: Date; lte?: Date } = {};
+      if (from) createdAt.gte = from;
+      if (to) createdAt.lte = to;
       const where = {
         ...(userId ? { user_id: userId } : {}),
         ...(actionType ? { action_type: actionType } : {}),
         ...(targetTable ? { target_table: targetTable } : {}),
-        ...(from ? { created_at: { gte: from } } : {}),
-        ...(to ? { created_at: { lte: to } } : {}),
+        ...(from || to ? { created_at: createdAt } : {}),
       };
       const [items, total] = await Promise.all([
         prisma.auditLog.findMany({

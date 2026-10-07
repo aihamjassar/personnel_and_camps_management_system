@@ -1,6 +1,6 @@
 import type { ApiEnvelope } from "./types";
 
-const API_BASE = import.meta.env.VITE_API_URL;
+const API_BASE = import.meta.env.VITE_API_URL || "/api/v1";
 
 export class ApiError extends Error {
   status: number;
@@ -60,10 +60,15 @@ export const api = {
   delete: <T,>(path: string) => apiRequest<T>(path, { method: "DELETE" }),
 };
 
-export async function downloadReport(format: "xlsx" | "pdf"): Promise<void> {
+export type ReportFilters = { from?: string; to?: string; camp_id?: number; status?: string };
+
+export async function downloadReport(format: "xlsx" | "pdf", filters: ReportFilters = {}): Promise<void> {
   const token = sessionStorage.getItem("personnel.session.token");
-  const API_BASE = import.meta.env.VITE_API_URL;
-  const response = await fetch(`${API_BASE}/reports/export?format=${format}`, {
+  const params = new URLSearchParams({ format });
+  for (const [key, value] of Object.entries(filters)) {
+    if (value !== undefined && value !== "") params.set(key, String(value));
+  }
+  const response = await fetch(`${API_BASE}/reports/export?${params.toString()}`, {
     headers: token ? { Authorization: `Bearer ${token}` } : undefined,
   });
   if (!response.ok) {

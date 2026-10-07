@@ -73,6 +73,11 @@ export interface Personnel {
   camp?: { camp_id: number; name: string } | null;
 }
 
+export interface AssignmentCandidate {
+  personnel_id: number;
+  full_name: string;
+}
+
 export interface PersonnelStatus {
   status_id: number;
   personnel_id: number;
@@ -112,7 +117,23 @@ export interface RoleOption {
 export interface Summary {
   total_personnel: number;
   active_personnel: number;
+  status_breakdown: { status: string; count: number }[];
+  filters: { from: string | null; to: string | null; camp_id: number | null; status: string | null };
+  available_camps: { camp_id: number; name: string }[];
   by_camp: { camp_id: number | null; name: string; count: number; capacity: number }[];
   by_rank: { rank_id: number | null; name: string; count: number }[];
   recent_transfers: unknown[];
 }
+
+export interface SystemSettings {
+  passwordMinLength: number;
+  requireUppercase: boolean;
+  requireNumber: boolean;
+  requireSymbol: boolean;
+  sessionDurationHours: number;
+}
+
+export type PasswordPolicy = Pick<
+  SystemSettings,
+  "passwordMinLength" | "requireUppercase" | "requireNumber" | "requireSymbol"
+>;

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Plus, Shield, UserRound, Pencil, Search } from "lucide-react";
 import { api, ApiError } from "../lib/api";
-import type { ManagedUser, RoleOption } from "../lib/types";
+import type { ManagedUser, PasswordPolicy, RoleOption } from "../lib/types";
 import { Button, DataState, DataTable, Field, inputClass, Modal, PageHeader, Panel, StatusBadge } from "../components/ui";
 
 function roleLabel(roleName: string) {
@@ -17,6 +17,7 @@ function roleLabel(roleName: string) {
 export default function UsersPage() {
   const [users, setUsers] = useState<ManagedUser[]>([]);
   const [roles, setRoles] = useState<RoleOption[]>([]);
+  const [passwordPolicy, setPasswordPolicy] = useState<PasswordPolicy>({ passwordMinLength: 8, requireUppercase: false, requireNumber: false, requireSymbol: false });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
@@ -29,12 +30,14 @@ export default function UsersPage() {
     setLoading(true);
     setError(null);
     try {
-      const [userData, roleData] = await Promise.all([
+      const [userData, roleData, policy] = await Promise.all([
         api.get<{ items: ManagedUser[] }>("/users"),
         api.get<{ items: { role_id: number; role_name: string; description: string | null }[] }>("/users/roles"),
+        api.get<PasswordPolicy>("/settings/password-policy"),
       ]);
       setUsers(userData.items);
       setRoles(roleData.items.map((item) => ({ role_id: item.role_id, role_name: item.role_name, description: item.description })));
+      setPasswordPolicy(policy);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "تعذّر تحميل المستخدمين.");
     } finally {
@@ -115,7 +118,7 @@ export default function UsersPage() {
           {!active && <Field label="اسم المستخدم"><input name="username" required minLength={3} maxLength={100} className={inputClass()} autoComplete="off" /></Field>}
           <Field label="الاسم الكامل"><input name="full_name" required minLength={1} maxLength={200} className={inputClass()} defaultValue={active?.full_name ?? ""} /></Field>
           <Field label="البريد الإلكتروني"><input name="email" type="email" maxLength={200} className={inputClass()} defaultValue={active?.email ?? ""} /></Field>
-          <Field label={active ? "كلمة مرور جديدة (اختياري)" : "كلمة المرور"}><input name="password" type="password" required={!active} minLength={8} maxLength={200} autoComplete="new-password" className={inputClass()} /></Field>
+          <Field label={active ? "كلمة مرور جديدة (اختياري)" : "كلمة المرور"} hint={`الحد الأدنى ${passwordPolicy.passwordMinLength} أحرف${passwordPolicy.requireUppercase ? " · حرف لاتيني كبير" : ""}${passwordPolicy.requireNumber ? " · رقم" : ""}${passwordPolicy.requireSymbol ? " · رمز خاص" : ""}`}><input name="password" type="password" required={!active} minLength={passwordPolicy.passwordMinLength} maxLength={200} autoComplete="new-password" className={inputClass()} /></Field>
           <Field label="الأدوار" hint="يمكن اختيار أكثر من دور باستخدام Ctrl أو Command."><select name="role_ids" multiple required={!active} className={`${inputClass()} min-h-32`} defaultValue={active?.roles.map(({ role }) => String(role.role_id)) ?? []}>{roles.map((role) => <option key={role.role_id} value={role.role_id}>{roleLabel(role.role_name)}</option>)}</select></Field>
           {active && <><label className="flex items-center gap-3 rounded-xl border border-line p-3 text-sm font-bold"><input type="checkbox" name="is_active" defaultChecked={active.is_active} className="h-4 w-4 accent-brand-600" />الحساب نشط</label><label className="flex items-start gap-3 rounded-xl bg-amber-50 p-3 text-xs leading-5 text-amber-900"><input type="checkbox" name="confirm_sensitive_change" className="mt-1 h-4 w-4 accent-brand-600" />عند تغيير الدور أو حالة الحساب، أؤكد أن ذلك سيغيّر الصلاحيات الفعلية للمستخدم.</label></>}
           {formError && <p role="alert" className="rounded-xl bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700">{formError}</p>}

@@ -52,16 +52,27 @@ async function main() {
   }
 
   const adminRole = await prisma.role.findUniqueOrThrow({ where: { role_name: "System Administrator" } });
-  await prisma.user.upsert({
-    where: { username: "admin" },
-    update: {},
-    create: {
-      username: "admin",
-      password_hash: await bcrypt.hash("Admin@1234", 10),
-      full_name: "System Administrator",
-      roles: { create: [{ role_id: adminRole.role_id }] },
-    },
-  });
+  const existingAdmin = await prisma.user.findUnique({ where: { username: "admin" } });
+  if (!existingAdmin) {
+    const bootstrapPassword = process.env.BOOTSTRAP_ADMIN_PASSWORD ??
+      (process.env.NODE_ENV === "production" ? undefined : "Admin@1234");
+    if (!bootstrapPassword || bootstrapPassword.length < 8) {
+      throw new Error("Set BOOTSTRAP_ADMIN_PASSWORD to a secret of at least 8 characters before creating the production administrator.");
+    }
+    await prisma.user.create({
+      data: {
+        username: "admin",
+        password_hash: await bcrypt.hash(bootstrapPassword, 10),
+        full_name: "System Administrator",
+        roles: { create: [{ role_id: adminRole.role_id }] },
+      },
+    });
+    if (process.env.NODE_ENV === "production" || process.env.BOOTSTRAP_ADMIN_PASSWORD) {
+      console.log("Administrator created; credential output is suppressed.");
+    } else {
+      console.log("Default local admin login: admin / Admin@1234 (change before any shared environment).");
+    }
+  }
 
   // Sample reference data so the UI isn't empty on first run (all fake/academic).
   const campCount = await prisma.camp.count();
@@ -93,7 +104,6 @@ async function main() {
   }
 
   console.log("Seed completed.");
-  console.log("Default admin login: admin / Admin@1234");
 }
 
 main()

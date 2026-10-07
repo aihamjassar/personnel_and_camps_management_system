@@ -8,6 +8,7 @@ process.env.DATABASE_URL = TEST_DATABASE_URL;
 beforeAll(async () => {
   const { prisma } = await import("../src/lib/prisma.js");
   // Delete in FK-safe order — schema has no onDelete: Cascade.
+  await prisma.systemSetting.deleteMany();
   await prisma.notification.deleteMany();
   await prisma.auditLog.deleteMany();
   await prisma.personnelStatus.deleteMany();

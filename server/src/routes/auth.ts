@@ -6,6 +6,7 @@ import { prisma } from "../lib/prisma.js";
 import { env } from "../config/env.js";
 import { ok, fail } from "../lib/response.js";
 import { writeAudit } from "../lib/audit.js";
+import { getSystemSettings } from "../lib/system-settings.js";
 import { authenticate, requireAnyPermission } from "../middleware/auth.js";
 import { validateBody } from "../middleware/validate.js";
 import { loginSchema } from "../validators/schemas.js";
@@ -40,8 +41,9 @@ authRouter.post("/login", loginLimiter, validateBody(loginSchema), async (req, r
       });
       return fail(res, 401, "Invalid credentials");
     }
+    const { sessionDurationHours } = await getSystemSettings();
     const token = jwt.sign({ sub: user.user_id, username: user.username }, env.jwtSecret, {
-      expiresIn: env.jwtExpiresIn as jwt.SignOptions["expiresIn"],
+      expiresIn: `${sessionDurationHours}h` as jwt.SignOptions["expiresIn"],
     });
     const permissions = user.roles.flatMap((ur) =>
       ur.role.permissions.map((rp) => rp.permission.permission_key),

@@ -68,6 +68,12 @@ docs/
 ├── memory.md                   ← هذا الملف
 ├── Implement-Plan.md
 ├── Architecture.md
+├── API-Reference.md
+├── Feasibility-Review-Addendum.md
+├── Requirements-Traceability.md
+├── Technical-Reference.md
+├── User-Guide.ar.md
+├── Testing-Report.md
 ├── Use-Case-Scenario.md
 ├── Use-Case-Action.md
 ├── Flow-of-Action.md
@@ -186,3 +192,17 @@ Phase 1 مكتملة، ونُفّذ الجانب البرمجي الأساسي �
 - أضيفت أوامر `pretest` و`pretest:coverage` و`pretypecheck` و`prebuild` لتوليد Prisma Client تلقائيًا قبل كل فحص يعتمد عليه.
 - بعد تثبيت الاعتمادات النظيفة على Linux وتوليد Prisma Client: **24/24** اختبار API ناجح، تغطية الأسطر 90.65%، الدوال 96.42%، والفروع 62.93%. نجح `npm run typecheck` و`npm run build`.
 - المتبقي: اختبارات وحدات مستقلة، إكمال اختبار السيناريوهات الشاملة/الواجهة، دليل المستخدم والتوثيق الفني وAPI، مصفوفة تتبع المتطلبات، فرز التحذيرات الأمنية، ثم قرارات النشر التجريبي وHTTPS والنسخ الاحتياطي.
+
+### نقطة استئناف Phase 4 — 2026-10-05
+
+- نُفّذ FR-16 لإعدادات النظام الدائمة: سياسة كلمة المرور ومدة JWT، مع صلاحيات منفصلة، تدقيق ذري، migration، اختبارات، صفحة RTL، وقواعد Unicode-aware. أبقِ سلوك المدة على الجلسات الجديدة فقط.
+- استُكملت إصلاحات FR-05/06/08/12/13/14: التحقق من هرمية الوحدات، endpoint مرشحي تعيين محدود البيانات، فلاتر التقارير وتوزيع الحالة، تسجيل الفلاتر المصدّرة، وتطبيق حدود التاريخ من/to معًا في التدقيق.
+- آخر تشغيل ناجح في 2026-10-05: `npm run coverage` يشغّل 50/50 اختبارًا (29 API/تكامل + 21 وحدة)؛ تغطية الأسطر/التعليمات 92.58%، الدوال 97.22%، والفروع 73.25%. اجتاز typecheck/build بعد تغييرات الخادم والواجهة السابقة.
+- أُنشئت الوثائق العربية [`User-Guide.ar.md`](User-Guide.ar.md)، [`Technical-Reference.md`](Technical-Reference.md)، [`API-Reference.md`](API-Reference.md)، [`Requirements-Traceability.md`](Requirements-Traceability.md)، و[`Feasibility-Review-Addendum.md`](Feasibility-Review-Addendum.md). صحّح ترقيم FR إلى: FR-02 تعديل/حذف، FR-03 بحث، FR-04 تاريخ الحالة.
+- جهزت ملفات `deploy/staging/` Docker Compose/Caddy/نسخ age؛ اجتاز YAML واختبار تفريغ/فك تشفير محلي، لكن لا Docker engine ولا مضيف أو DNS عام. لا تدّعِ وجود staging أو شهادة HTTPS أو نسخة خارج الموقع.
+- أظهر `npm audit --omit=dev` في 2026-10-05 سبعة تحذيرات إنتاجية (3 high، 4 moderate) في Prisma/deepmerge-ts وReact Router وExcelJS/uuid. لم تُطبق ترقيات مكسرة تلقائيًا؛ يجب إصلاحها واختبارها قبل التعرض العام.
+- توجد مصفوفة متطلبات API لكنها لا تحل محل E2E متصفح كامل أو مراجعة فريق مستقلة لـPhase 2. لا تُحوّل هذين البندين إلى مكتمل دون أدلة بشرية.
+- دراسة الجدوى الأصلية الكاملة غير موجودة داخل المستودع؛ ملحق الجدوى يصرّح بهذا القيد ولا يُعد نسخة نهائية منها.
+- العمل الجاري بعد commit `47d2186` محلي وغير مدفوع. لا تُدفع تغييرات جديدة إلى `origin/main` دون موافقة صريحة جديدة على الحمولة الجديدة.
+- العرض النهائي مسجل في Slides HTML من 10 شرائح؛ يلزم استئناف deck المسجل، تحديث شريحة القياس إلى 50 اختبارًا/92.58%/73.25%، ثم اجتياز خطوة `present` قبل إعلان تسليمه.
+- فحص متصفح محلي في 2026-10-06 كشف غياب `VITE_API_URL` في الإعداد الافتراضي؛ أصلح `client/src/lib/api.ts` بالرجوع إلى `/api/v1` وتم التحقق عبر login/dashboard/settings على بيانات اصطناعية. لا يزال E2E الشامل مطلوبًا.

@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, type NextFunction, type Request, type Response } from "express";
 import { prisma } from "../lib/prisma.js";
 import { ok } from "../lib/response.js";
 import { writeAudit } from "../lib/audit.js";
@@ -117,6 +117,43 @@ simpleCrud({
 
 export const unitsRouter = Router();
 unitsRouter.use(authenticate);
+const validateUnitHierarchy = async (req: Request, _res: Response, next: NextFunction) => {
+  try {
+    const unitId = req.method === "PUT" ? Number(req.params.id) : undefined;
+    const current = unitId
+      ? await prisma.organizationalUnit.findUnique({ where: { unit_id: unitId }, select: { camp_id: true, parent_unit_id: true } })
+      : null;
+    const campId = req.body?.camp_id ?? current?.camp_id;
+    const parentId = req.body?.parent_unit_id ?? current?.parent_unit_id;
+    if (parentId == null || !Number.isInteger(campId) || !Number.isInteger(parentId)) return next();
+    if (parentId === unitId) throw new HttpError(400, "A unit cannot be its own parent");
+
+    const seen = new Set<number>();
+    let parent = await prisma.organizationalUnit.findUnique({
+      where: { unit_id: parentId },
+      select: { unit_id: true, camp_id: true, parent_unit_id: true },
+    });
+    if (!parent) throw new HttpError(400, "Parent unit not found");
+    if (parent.camp_id !== campId) throw new HttpError(400, "Parent unit must belong to the same camp");
+    while (parent) {
+      if (parent.unit_id === unitId || seen.has(parent.unit_id)) {
+        throw new HttpError(400, "Unit hierarchy cannot contain a cycle");
+      }
+      seen.add(parent.unit_id);
+      if (parent.parent_unit_id === null) break;
+      parent = await prisma.organizationalUnit.findUnique({
+        where: { unit_id: parent.parent_unit_id },
+        select: { unit_id: true, camp_id: true, parent_unit_id: true },
+      });
+      if (parent && parent.camp_id !== campId) throw new HttpError(400, "Parent hierarchy must belong to the same camp");
+    }
+    return next();
+  } catch (err) {
+    return next(err);
+  }
+};
+unitsRouter.post("/", validateUnitHierarchy);
+unitsRouter.put("/:id", validateUnitHierarchy);
 simpleCrud({
   router: unitsRouter,
   model: prisma.organizationalUnit,
@@ -164,6 +201,19 @@ simpleCrud({
 // Assignments (FR-08) — append-oriented: creating a new one may close the previous current one.
 export const assignmentsRouter = Router();
 assignmentsRouter.use(authenticate);
+
+assignmentsRouter.get("/eligible-personnel", requirePermission("assignments.manage"), async (_req, res, next) => {
+  try {
+    const items = await prisma.personnel.findMany({
+      where: { deleted_at: null, is_active: true },
+      select: { personnel_id: true, full_name: true },
+      orderBy: { full_name: "asc" },
+    });
+    return ok(res, { items, total: items.length });
+  } catch (err) {
+    next(err);
+  }
+});
 
 assignmentsRouter.get("/", requirePermission("assignments.manage"), async (_req, res, next) => {
   try {

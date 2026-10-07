@@ -12,6 +12,7 @@ import { auditRouter } from "./routes/audit.js";
 import { transfersRouter } from "./routes/transfers.js";
 import { rolesRouter } from "./routes/roles.js";
 import { notificationsRouter } from "./routes/notifications.js";
+import { settingsRouter } from "./routes/settings.js";
 import { fail } from "./lib/response.js";
 
 export function createApp() {
@@ -39,6 +40,7 @@ export function createApp() {
   app.use("/api/v1/reports", reportsRouter);
   app.use("/api/v1/audit", auditRouter);
   app.use("/api/v1/notifications", notificationsRouter);
+  app.use("/api/v1/settings", settingsRouter);
 
   app.use("/api", (_req, res) => fail(res, 404, "Endpoint not found"));
   app.use(errorHandler);
