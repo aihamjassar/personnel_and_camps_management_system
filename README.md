@@ -1,6 +1,6 @@
 # Integrated Personnel and Camps Management System
 
-**Language:** [English](README.md) · [العربية](README.ar.md)
+**Language:** [English](README.md) · [العربية](README.ar.md) 
 
 An academic full-stack system for managing fictional personnel records and camp facilities. The application uses React, TypeScript, Express, Prisma, and PostgreSQL, with an Arabic right-to-left interface. **Use fictional academic data only—never enter real personnel, military, or sensitive information.**
 
