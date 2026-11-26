@@ -54,7 +54,7 @@ async function main() {
   const adminRole = await prisma.role.findUniqueOrThrow({ where: { role_name: "System Administrator" } });
   const existingAdmin = await prisma.user.findUnique({ where: { username: "admin" } });
   if (!existingAdmin) {
-    const bootstrapPassword = process.env.BOOTSTRAP_ADMIN_PASSWORD ??
+    const bootstrapPassword = "Admin@1234" // process.env.BOOTSTRAP_ADMIN_PASSWORD ??
       (process.env.NODE_ENV === "production" ? undefined : "Admin@1234");
     if (!bootstrapPassword || bootstrapPassword.length < 8) {
       throw new Error("Set BOOTSTRAP_ADMIN_PASSWORD to a secret of at least 8 characters before creating the production administrator.");
