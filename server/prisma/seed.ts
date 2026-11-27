@@ -75,30 +75,57 @@ async function main() {
   }
 
   // Sample reference data so the UI isn't empty on first run (all fake/academic).
+  // Arabic camp and unit names are fictional demonstration data, not real formations.
   const campCount = await prisma.camp.count();
   if (campCount === 0) {
-    const north = await prisma.camp.create({ data: { name: "North Camp", capacity: 500, location: "Sector A" } });
-    const south = await prisma.camp.create({ data: { name: "South Camp", capacity: 300, location: "Sector B" } });
-    await prisma.organizationalUnit.createMany({
-      data: [
-        { name: "Alpha Company", camp_id: north.camp_id },
-        { name: "Bravo Company", camp_id: north.camp_id },
-        { name: "Charlie Company", camp_id: south.camp_id },
-      ],
+    const regionOne = await prisma.camp.create({
+      data: { name: "معسكر المنطقة الأولى (افتراضي)", capacity: 800, location: "قطاع تجريبي أ" },
     });
+    const regionTwo = await prisma.camp.create({
+      data: { name: "معسكر المنطقة الثانية (افتراضي)", capacity: 600, location: "قطاع تجريبي ب" },
+    });
+
+    // Demonstrate parent-child unit management with invented sample records.
+    const chains = [
+      { camp: regionOne, region: "الأولى", axis: "الشمالي", brigade: "الأول" },
+      { camp: regionTwo, region: "الثانية", axis: "الجنوبي", brigade: "الثاني" },
+    ];
+    for (const chain of chains) {
+      const region = await prisma.organizationalUnit.create({
+        data: { name: `قيادة المنطقة ${chain.region} (افتراضية)`, camp_id: chain.camp.camp_id },
+      });
+      const axis = await prisma.organizationalUnit.create({
+        data: { name: `المحور ${chain.axis} (افتراضي)`, camp_id: chain.camp.camp_id, parent_unit_id: region.unit_id },
+      });
+      const brigade = await prisma.organizationalUnit.create({
+        data: { name: `اللواء ${chain.brigade} (افتراضي)`, camp_id: chain.camp.camp_id, parent_unit_id: axis.unit_id },
+      });
+      const battalion = await prisma.organizationalUnit.create({
+        data: { name: "الكتيبة الأولى (افتراضية)", camp_id: chain.camp.camp_id, parent_unit_id: brigade.unit_id },
+      });
+      await prisma.organizationalUnit.create({
+        data: { name: "السرية الأولى (افتراضية)", camp_id: chain.camp.camp_id, parent_unit_id: battalion.unit_id },
+      });
+    }
+
     await prisma.rank.createMany({
       data: [
-        { name: "Captain", level: 1 },
-        { name: "Lieutenant", level: 2 },
-        { name: "Sergeant", level: 3 },
-        { name: "Private", level: 4 },
+        { name: "عقيد (افتراضي)", level: 1 },
+        { name: "مقدم (افتراضي)", level: 2 },
+        { name: "رائد (افتراضي)", level: 3 },
+        { name: "نقيب (افتراضي)", level: 4 },
+        { name: "ملازم (افتراضي)", level: 5 },
+        { name: "رقيب (افتراضي)", level: 6 },
+        { name: "عريف (افتراضي)", level: 7 },
+        { name: "جندي (افتراضي)", level: 8 },
       ],
     });
     await prisma.position.createMany({
       data: [
-        { name: "Company Commander" },
-        { name: "Platoon Leader" },
-        { name: "Administrative Officer" },
+        { name: "قائد لواء (تجريبي)" },
+        { name: "قائد كتيبة (تجريبي)" },
+        { name: "قائد سرية (تجريبي)" },
+        { name: "ضابط إداري (تجريبي)" },
       ],
     });
   }
